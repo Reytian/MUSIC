@@ -1,0 +1,2 @@
+pyguitarpro>=0.10
+mcp>=1.0
