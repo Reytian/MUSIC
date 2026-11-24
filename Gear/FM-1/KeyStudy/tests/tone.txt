@@ -1,0 +1,45 @@
+# The default piano has an audible attack, plays a chord and can be changed in Settings.
+wait 600
+expect pref_tone 0
+master 3500
+wav piano-preview.wav
+key 7 down
+wait 650
+key 7 up
+wait 210
+tap PLAY
+wait 1260
+wavstop
+expect peak_db_min -27
+expect peak_db_max -5
+tap ENV
+spin SELECT -1
+expect settings_item 7
+shot piano-tone-settings.png
+spin PRESET 1
+expect pref_tone 0
+tap SAVE
+expect pref_tone 1
+reboot
+wait 600
+expect pref_tone 1
+
+# A held piano note decays to silence and a subsequent press starts a fresh voice.
+tap ENV
+spin SELECT -1
+spin PRESET 1
+tap SAVE
+expect pref_tone 0
+master 3500
+key 7 down
+wait 1670
+peakreset
+wait 200
+expect peak_db_max -70
+key 7 up
+wait 70
+peakreset
+key 7 down
+wait 200
+expect peak_db_min -27
+key 7 up

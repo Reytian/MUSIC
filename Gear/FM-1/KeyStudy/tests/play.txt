@@ -1,0 +1,144 @@
+# Study Bm7, hear it, then submit its first inversion with an octave doubling.
+wait 600
+expect practice 0
+expect topic 3
+expect root 11
+expect quality 1
+expect guides 74304
+expect score_visible 1
+shot learn.png
+tap PLAY
+expect demo_lights 74304
+peakreset
+wav bm7.wav
+wait 500
+wavstop
+expect peak_db_min -27
+expect peak_db_max -5
+wait 650
+expect demo_lights 0
+peakreset
+wait 100
+expect peak_db_max -70
+tap SEQ
+spin SELECT -1
+spin SELECT 1
+expect practice 1
+expect guides 0
+expect score_visible 0
+shot practice.png
+key 9 down
+wait 110
+key 13 down
+wait 110
+key 16 down
+wait 110
+key 18 down
+key 21 down
+wait 130
+expect result 2
+expect complete 1
+expect solved 1
+expect first_try 1
+expect score_visible 1
+shot correct.png
+tap EDIT
+expect result 0
+expect complete 1
+wait 160
+expect complete 1
+key 9 up
+key 13 up
+key 16 up
+key 18 up
+key 21 up
+wait 120
+expect complete 1
+
+# An exact chord cannot pass with an extra note, or pass from three chord tones.
+tap HOME
+tap SEQ
+spin SELECT -1
+spin SELECT 1
+key 6 down
+key 9 down
+key 13 down
+wait 140
+expect result 0
+tap EDIT
+expect result 1
+expect score_visible 0
+key 16 down
+key 7 down
+wait 140
+expect result 1
+expect complete 0
+key 7 up
+wait 130
+expect result 2
+expect first_try 0
+expect solved 1
+key 6 up
+key 9 up
+key 13 up
+key 16 up
+
+# Collect can toggle a pitch off via another octave and accept rolled entry.
+tap HOME
+tap SEQ
+spin SELECT -1
+spin SELECT 1
+tap ARP
+tapkey 6
+tapkey 18
+expect collect_pcs 0
+tapkey 9
+tap REC
+expect collect_pcs 0
+tapkey 9
+tapkey 13
+tapkey 16
+expect result 0
+tapkey 6
+wait 120
+expect result 2
+expect first_try 1
+
+# TRS and USB notes can answer together, and note offs only release their source/channel.
+tap HOME
+tap SEQ
+spin SELECT -1
+spin SELECT 1
+tap ARP
+midi TRS 90 3B 60
+midi USB 91 3B 60
+midi USB 90 3E 60
+midi TRS 90 42 60
+midi TRS 90 45 60
+wait 130
+expect result 2
+expect held_pcs 2628
+midi TRS 80 3B 00
+midi USB 90 3B 00
+wait 20
+expect held_pcs 2628
+midi USB B1 7B 00
+midi USB 80 3E 00
+midi TRS B0 78 00
+wait 20
+expect held_pcs 0
+
+# The reveal makes the question assisted without blocking a correct answer.
+tap HOME
+tap SEQ
+spin SELECT -1
+spin SELECT 1
+tap FX
+expect guides 74304
+key 6 down
+key 9 down
+key 13 down
+key 16 down
+wait 130
+expect result 2
+expect first_try 0

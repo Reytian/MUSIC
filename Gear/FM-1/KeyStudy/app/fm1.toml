@@ -1,0 +1,9 @@
+name = "KEYSTUDY"
+id_prefix = "FM-1_54"
+usb_manufacturer = "KeyStudy"
+usb_product = "KeyStudy FM-1"
+font_full = ["M", "L"]
+gen = ["../tools/piano_bank.py embed assets/piano.ulaw {gen}/keystudy_piano.h"]
+usb_audio_out = false
+tagline = "A pocket music theory trainer for M-VAVE FM-1."
+licence = "MPL-2.0"

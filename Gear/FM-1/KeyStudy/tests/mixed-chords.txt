@@ -1,0 +1,57 @@
+# The default practice rotates ten chord types and ten roots.
+wait 600
+tap SEQ
+expect mixed_chords 1
+expect root 9
+expect quality 3
+expect shape_size 3
+shot mixed-practice.png
+key 4 down
+key 8 down
+key 12 down
+wait 130
+expect result 2
+expect first_try 1
+key 4 up
+key 8 up
+key 12 up
+tap EDIT
+expect mixed_roots 2
+expect mixed_qualities 2
+tap SAVE
+tap EDIT
+expect mixed_roots 3
+expect mixed_qualities 3
+tap SAVE
+tap EDIT
+expect mixed_roots 4
+expect mixed_qualities 4
+tap SAVE
+tap EDIT
+expect mixed_roots 5
+expect mixed_qualities 5
+tap SAVE
+tap EDIT
+expect mixed_roots 6
+expect mixed_qualities 6
+tap SAVE
+tap EDIT
+expect mixed_roots 7
+expect mixed_qualities 7
+tap SAVE
+tap EDIT
+expect mixed_roots 8
+expect mixed_qualities 8
+tap SAVE
+tap EDIT
+expect mixed_roots 9
+expect mixed_qualities 9
+tap SAVE
+tap EDIT
+expect mixed_roots 10
+expect mixed_qualities 10
+tap SAVE
+tap EDIT
+expect score_screen 1
+expect solved 1
+expect complete 10

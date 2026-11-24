@@ -1,0 +1,107 @@
+# Settings are staged until SAVE, retained through reboot, and used by both quiz paths.
+wait 600
+tap ENV
+expect settings_open 1
+spin PRESET 1
+spin SELECT 1
+spin PRESET -5
+spin SELECT 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 1
+tap SEL
+spin PRESET 4
+tap SEL
+expect pref_error 2
+spin SELECT 1
+tap SEL
+spin SELECT 1
+tap SEL
+spin SELECT 1
+spin PRESET 1
+spin SELECT 1
+spin PRESET -1
+wait 40
+shot settings.png
+expect pref_clef 1
+expect pref_length 10
+tap SAVE
+expect settings_open 0
+expect pref_clef 2
+expect pref_length 5
+expect pref_intervals 1
+expect pref_chords 11
+expect pref_scales 10
+expect pref_naturals 1
+expect pref_order 2
+expect store_writes 1
+reboot
+wait 600
+expect pref_clef 2
+expect pref_length 5
+expect pref_intervals 1
+expect pref_order 2
+shot bass-clef.png
+tap ENV
+spin SELECT 1
+spin PRESET -1
+tap ENV
+expect pref_clef 2
+tap SEQ
+expect mixed_chords 1
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+expect complete 5
+expect score_screen 1
+tap GLO
+spin SELECT 3
+spin PRESET 2
+tap EDIT
+expect lib_kind 2
+expect lib_quality 3
+expect lib_choice 3
+tap PLAY
+wait 80
+expect lib_demo 2
+expect lib_block_demo 1
+expect lib_lights 0
+tap HOME
+tap ENV
+spin SELECT -1
+spin PRESET -1
+flash_fail 1
+tap SAVE
+expect pref_error 1
+expect settings_open 1
+expect pref_clef 2
+flash_fail 0
+tap SAVE
+expect settings_open 0
+expect pref_clef 1
+shot treble-clef.png

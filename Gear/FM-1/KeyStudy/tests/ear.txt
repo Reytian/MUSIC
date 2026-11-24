@@ -1,0 +1,39 @@
+# Auditioning a hidden seventh does not light the answer keys.
+wait 600
+tap SEQ
+spin ALGO 1
+expect ear 1
+expect choice 0
+expect guides 0
+expect score_visible 0
+tap PLAY
+expect demo_lights 0
+peakreset
+wait 180
+expect peak_db_min -27
+expect guides 0
+expect score_visible 0
+shot ear.png
+wait 750
+
+# A selected type can be submitted, and an unassisted answer earns credit.
+expect quality 11
+spin PRESET 11
+expect choice 11
+tap EDIT
+expect result 2
+expect first_try 1
+expect guides >0
+expect score_visible 1
+tap EDIT
+expect complete 1
+expect guides 0
+expect score_visible 0
+expect choice 0
+tap FX
+expect guides >0
+expect score_visible 1
+tap SAVE
+expect result 3
+expect solved 1
+expect complete 2

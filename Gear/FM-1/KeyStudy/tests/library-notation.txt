@@ -1,0 +1,45 @@
+# Read a flat signature, then construct a seven-sharp signature.
+wait 600
+tap SEQ
+tap GLO
+spin PRESET 1
+tap EDIT
+expect lib_fifths -1
+spin PRESET -1
+tap EDIT
+expect lib_result 2
+tap GLO
+spin SELECT 1
+spin PRESET 1
+tap EDIT
+expect lib_fifths 7
+spin PRESET 7
+tap EDIT
+expect lib_result 2
+shot key-signature.png
+
+# Build a D minor-major seventh onto its written root.
+tap GLO
+spin PRESET 3
+tap EDIT
+expect lib_quality 11
+expect lib_first_note 62
+expect lib_filled 1
+tapkey 12
+tapkey 16
+tapkey 20
+expect lib_filled 15
+tap EDIT
+expect lib_result 2
+
+# Name a B-flat diminished triad from the marked keys.
+tap GLO
+spin SELECT 1
+spin PRESET 4
+tap EDIT
+expect lib_quality 2
+expect lib_first_note 58
+spin ALGO -2
+spin PRESET 2
+tap EDIT
+expect lib_result 2

@@ -1,0 +1,193 @@
+# Every library activity opens on the normal front-panel controls.
+wait 600
+tap SEQ
+tap GLO
+expect lib_page 1
+shot library.png
+expect lib_group 0
+tap EDIT
+expect lib_page 2
+expect lib_item 0
+expect lib_kind 0
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 1
+expect lib_kind 1
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 2
+expect lib_kind 2
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 3
+expect lib_kind 3
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 4
+expect lib_kind 4
+tap GLO
+expect lib_page 1
+spin SELECT 1
+expect lib_group 1
+tap EDIT
+expect lib_page 2
+expect lib_item 0
+expect lib_kind 0
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 1
+expect lib_kind 1
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 2
+expect lib_kind 2
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 3
+expect lib_kind 3
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 4
+expect lib_kind 4
+tap GLO
+expect lib_page 1
+spin SELECT 1
+expect lib_group 2
+tap EDIT
+expect lib_page 2
+expect lib_item 0
+expect lib_kind 0
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 1
+expect lib_kind 5
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 2
+expect lib_kind 2
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 3
+expect lib_kind 3
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 4
+expect lib_kind 4
+tap GLO
+expect lib_page 1
+spin SELECT 1
+expect lib_group 3
+tap EDIT
+expect lib_page 2
+expect lib_item 0
+expect lib_kind 6
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 1
+expect lib_kind 0
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 2
+expect lib_kind 2
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 3
+expect lib_kind 3
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 4
+expect lib_kind 4
+tap GLO
+expect lib_page 1
+tap HOME
+tap GLO
+expect lib_group 4
+tap EDIT
+expect lib_page 2
+expect lib_item 0
+expect lib_kind 7
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 1
+expect lib_kind 2
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 2
+expect lib_kind 3
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 3
+expect lib_kind 4
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 4
+expect lib_kind 8
+tap GLO
+expect lib_page 1
+spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_item 5
+expect lib_kind 9
+tap GLO
+expect lib_page 1
