@@ -2,7 +2,7 @@
 #pragma once
 #include "plat.h"
 
-#define APP_NAME "KEYSTUDY"
+#define APP_NAME "CADENCE-1"
 #define APP_SPLASH_RGB RGB(125, 225, 194)
 #define APP_BLOCK 256u
 #define APP_CANVAS_PX (240u * 152u)

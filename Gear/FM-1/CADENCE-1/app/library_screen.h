@@ -269,7 +269,7 @@ static void library_draw_menu(void)
     int level = kind_level(group->kinds[library.menu_item]);
     char line[48], *p;
     cv_begin(240, 110, STUDY_BG);
-    library_title_bar("Practice Library", "KeyStudy");
+    library_title_bar("Practice Library", "CADENCE-1");
     library_menu_rows(0, 110);
     cv_blit(0, 0);
 

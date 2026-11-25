@@ -1,6 +1,6 @@
-# KeyStudy for M-VAVE FM-1
+# CADENCE-1 for M-VAVE FM-1
 
-KeyStudy 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM-1 的真琴键用作主要的作答方式。**HOME** 进入学习，**SEQ** 进入练习。开机显示学习页，默认示例是 **Bm7**。
+CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM-1 的真琴键用作主要的作答方式。名字取自和声里的终止式（cadence），也指每天练习的节奏。0.5.0 以前叫 KeyStudy。**HOME** 进入学习，**SEQ** 进入练习。开机显示学习页，默认示例是 **Bm7**。
 
 ## 学习
 
@@ -86,11 +86,11 @@ KeyStudy 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM-
 
 ## 试听与安装
 
-- **先试听**。在 [FM-1 Emulator](https://joakimeriksson.github.io/fm1-emu/) 选择 **Open .fwsc…**，打开 [keystudy-0.5.0.fwsc](dist/keystudy-0.5.0.fwsc)。
+- **先试听**。在 [FM-1 Emulator](https://joakimeriksson.github.io/fm1-emu/) 选择 **Open .fwsc…**，打开 [cadence-1-0.5.0.fwsc](dist/cadence-1-0.5.0.fwsc)。
 - **安装到 FM-1**。固件包适用于 M-VAVE FM-1。刷写前备份目前的固件与数据，可使用 [M-Flasher](https://github.com/jvitkauskas/m-flasher)。在已经运行兼容社区固件的 FM-1 上，可用数据线连接并运行下面的更新程序。它会显示识别到的设备，确认后才开始写入。
 
 ```sh
-python3 base/tools/fm1_install.py dist/keystudy-0.5.0.fwsc
+python3 base/tools/fm1_install.py dist/cadence-1-0.5.0.fwsc
 ```
 
 更新程序需要 `mido` 和 `python-rtmidi`。首次使用原厂固件或其他引导程序的机器，请按现有固件的安装路径操作。设备固件身份为 `FM-1_54000500`。文件校验值见 [SHA256SUMS](dist/SHA256SUMS)。
@@ -107,7 +107,7 @@ python3 base/tools/fm1_install.py dist/keystudy-0.5.0.fwsc
 cc -std=c99 -Wall -Wextra -Werror tests/notation.c -o app/build/host/notation_test
 app/build/host/notation_test
 for scenario in tests/*.txt; do
-  app/build/host/keystudy_host "$scenario" app/build/host || exit
+  app/build/host/cadence-1_host "$scenario" app/build/host || exit
 done
 ```
 
@@ -119,7 +119,7 @@ done
 
 `build.sh` 会取得固定版本的 fm1-base 与 felucca-bsp。可用 `JIELI_TOOLCHAIN`、`AC79_SDK` 和 `PYTHON` 指定安装位置。源代码在 `app/`，生成的固件在 `app/build/`。
 
-KeyStudy 与所用平台代码采用 MPL-2.0。平台来自 [fm1-base](https://github.com/charlesvestal/fm1-base/tree/3c4a57eea659f942b0c80a99949dddafc094a57b) 和 [felucca-bsp](https://github.com/hugelton/felucca-bsp/tree/41a6e86d921f842243bd01a48111832f7e55b4e2)。固件包所含的 JieLi SDK 组件、Barlow 字体及 Bravura 乐谱符号的许可见 [dist/licenses](dist/licenses)。
+CADENCE-1 与所用平台代码采用 MPL-2.0。平台来自 [fm1-base](https://github.com/charlesvestal/fm1-base/tree/3c4a57eea659f942b0c80a99949dddafc094a57b) 和 [felucca-bsp](https://github.com/hugelton/felucca-bsp/tree/41a6e86d921f842243bd01a48111832f7e55b4e2)。固件包所含的 JieLi SDK 组件、Barlow 字体及 Bravura 乐谱符号的许可见 [dist/licenses](dist/licenses)。
 
 谱面符号取自 [Bravura](https://github.com/steinbergmedia/bravura/tree/37b194378b710cc40e406ab6c4b07608bb9548ae)。可用 `python3 tools/rasterize_staff.py Bravura.otf app/staff_glyphs.h` 重建符号位图。
 

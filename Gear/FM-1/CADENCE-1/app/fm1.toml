@@ -1,0 +1,9 @@
+name = "CADENCE-1"
+id_prefix = "FM-1_54"
+usb_manufacturer = "CADENCE-1"
+usb_product = "CADENCE-1 FM-1"
+font_full = ["M", "T"]
+gen = ["../tools/piano_bank.py embed assets/piano.ulaw {gen}/piano_bank.h"]
+usb_audio_out = false
+tagline = "A pocket music theory trainer for M-VAVE FM-1."
+licence = "MPL-2.0"

@@ -38,7 +38,7 @@ static void calc_context(char out[48])
 static void calc_menu(void)
 {
     cv_begin(240, 91, STUDY_BG);
-    library_title_bar("Learn Tools", "KeyStudy");
+    library_title_bar("Learn Tools", "CADENCE-1");
     cv_rect(11, 41, 81, 20, STUDY_MINT);
     cv_text(16, 43, &FONT_XS, "Calculators", STUDY_BG);
     for (int band = 0; band < 2; ++band) {

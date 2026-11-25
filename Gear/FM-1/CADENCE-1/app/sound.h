@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-#include "keystudy_piano.h"
+#include "piano_bank.h"
 
 /* The audio interrupt owns the voices; the foreground publishes the desired notes. */
 enum { VOICE_COUNT = 12, SAMPLE_FRACTION_BITS = 16 };

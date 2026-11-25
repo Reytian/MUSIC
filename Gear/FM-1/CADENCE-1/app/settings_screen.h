@@ -77,7 +77,7 @@ static void settings_frame(uint32_t now)
     int first = clamp(selected - 3, 0, count > 8 ? count - 8 : 0);
 
     cv_begin(240, 45, STUDY_BG);
-    library_title_bar("Settings", "KeyStudy");
+    library_title_bar("Settings", "CADENCE-1");
     char place[12];
     append_number(append_text(append_number(place, selected + 1), " of "), count);
     cv_caps(12, 32, &FONT_T, "Changes apply when saved", STUDY_MUTED);

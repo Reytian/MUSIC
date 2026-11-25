@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Prepare or embed KeyStudy's compact, tuned Salamander Grand Piano sample bank."""
+"""Prepare or embed CADENCE-1's compact, tuned Salamander Grand Piano sample bank."""
 import argparse
 import math
 import struct
@@ -102,7 +102,7 @@ def c_rows(values, indent, count):
 def embed(asset, output):
     raw = asset.read_bytes()
     if not raw.startswith(MAGIC) or len(raw) != len(MAGIC) + (ENTRY.size + FRAMES) * len(ANCHORS):
-        raise ValueError(f"{asset}: invalid KeyStudy piano bank")
+        raise ValueError(f"{asset}: invalid CADENCE-1 piano bank")
     lines = [
         "/* Generated from the compact piano bank. See dist/licenses/Salamander-Attribution.md. */",
         f"enum {{ PIANO_RATE = {RATE}, PIANO_FRAMES = {FRAMES}, PIANO_ANCHORS = {len(ANCHORS)} }};",
