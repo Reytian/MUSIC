@@ -14,7 +14,7 @@ expect peak_db_min -27
 expect peak_db_max -5
 tap ENV
 spin SELECT -1
-expect settings_item 7
+expect settings_item 19
 shot piano-tone-settings.png
 spin PRESET 1
 expect pref_tone 0

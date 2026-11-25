@@ -1,0 +1,48 @@
+# An item answered wrongly comes back three questions later, while it is still fresh.
+wait 600
+tap SEQ
+expect lib_again 0
+# The first question of this script is B minor.
+expect lib_item_id 23
+key 0 down
+key 1 down
+key 2 down
+wait 150
+expect lib_result 1
+key 2 up
+key 3 down
+wait 150
+expect lib_result 4
+expect lib_again 1
+key 0 up
+key 1 up
+key 3 up
+wait 1500
+tap EDIT
+
+# A skipped question is listed for review but does not jump the queue.
+tap SAVE
+expect lib_again 1
+tap EDIT
+tap SAVE
+tap EDIT
+expect lib_seen 3
+tap SAVE
+tap EDIT
+expect lib_item_id 23
+expect lib_again 0
+expect lib_seen 4
+
+# Answered right this time, it goes back into the ordinary draw.
+key 6 down
+key 9 down
+key 13 down
+wait 150
+expect lib_result 2
+expect lib_again 0
+key 6 up
+key 9 up
+key 13 up
+wait 1100
+expect lib_seen 5
+expect lib_missed 4

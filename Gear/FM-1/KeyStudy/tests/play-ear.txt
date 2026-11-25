@@ -1,0 +1,149 @@
+# Play by Ear: the question plays by itself, with the starting key lit.
+wait 600
+tap SEQ
+tap GLO
+spin SELECT 2
+tap EDIT
+expect lib_group 2
+expect lib_kind 0
+expect lib_given 60
+expect lib_anchors 128
+expect demo 0
+wait 320
+expect demo 2
+expect lib_lights 0
+wait 700
+expect demo 0
+
+# C sounds first, then the note to find. Keys wait until the question has played.
+ask 4
+wait 40
+expect lib_first_note 64
+tap PLAY
+wait 20
+expect demo 2
+expect lib_hinted 0
+tapkey 11
+expect lib_result 0
+expect lib_position 0
+wait 620
+tapkey 11
+expect lib_result 2
+expect lib_first_try 1
+expect lib_revealed 1
+shot ear-note.png
+wait 1000
+
+# The next question plays by itself once the keys are up.
+expect lib_result 0
+wait 400
+expect demo 2
+wait 700
+
+# An interval is echoed from its lit first note.
+spin SELECT 1
+expect lib_kind 2
+wait 1200
+ask 86
+wait 40
+expect lib_given 62
+expect lib_anchors 512
+tapkey 9
+tapkey 16
+expect lib_result 2
+wait 1000
+
+# Descending, the top note sounds first and is the one lit.
+tap ENV
+spin SELECT -2
+expect settings_item 18
+spin PRESET 1
+tap SAVE
+expect pref_order 1
+wait 1200
+ask 86
+wait 40
+expect lib_given 69
+tapkey 9
+expect lib_result 1
+tapkey 16
+expect lib_position 1
+tapkey 9
+expect lib_result 2
+wait 1000
+
+# Together, both keys are held.
+tap ENV
+spin SELECT -2
+spin PRESET 1
+tap SAVE
+expect pref_order 2
+wait 1200
+ask 86
+wait 40
+expect lib_given 62
+key 9 down
+key 16 down
+wait 140
+expect lib_result 2
+key 9 up
+key 16 up
+wait 1000
+tap ENV
+spin SELECT -2
+spin PRESET 1
+tap SAVE
+expect pref_order 0
+
+# A chord is held in any voicing, its root lit.
+spin SELECT 1
+expect lib_kind 4
+wait 1500
+ask 12
+wait 40
+expect lib_given 60
+key 10 down
+key 14 down
+key 19 down
+wait 140
+expect lib_result 2
+key 10 up
+key 14 up
+key 19 up
+wait 1000
+
+# A melody is played back note for note; a wrong note keeps its place.
+spin SELECT 1
+expect lib_kind 6
+wait 2000
+seed 12345
+ask 0 0
+wait 40
+expect lib_count 3
+expect lib_fifths -1
+expect lib_given 65
+tapkey 12
+tapkey 13
+expect lib_result 1
+expect lib_position 1
+tapkey 14
+tapkey 12
+expect lib_result 2
+expect lib_first_try 0
+shot ear-melody.png
+wait 1000
+
+# Later note levels lengthen the tune.
+level 0 3
+wait 2600
+seed 777
+ask 0 1
+wait 40
+expect lib_count 5
+expect lib_fifths 0
+tapkey 7
+tapkey 9
+tapkey 6
+tapkey 4
+tapkey 6
+expect lib_result 2

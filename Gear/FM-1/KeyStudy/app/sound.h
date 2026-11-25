@@ -36,7 +36,7 @@ static void sound_init(void)
 static void assign_voices(void)
 {
     NoteSet pending = sound_notes;
-    int tone = settings.open && settings.item == FILTER_TONE ? settings.draft.tone : prefs.tone;
+    int tone = settings.open && settings.item == SET_TONE ? settings.draft.tone : prefs.tone;
     for (int i = 0; i < VOICE_COUNT; ++i) {
         StudyVoice *voice = &study_voices[i];
         voice->on = voice->on && voice->tone == tone && key_contains(&pending, voice->note);

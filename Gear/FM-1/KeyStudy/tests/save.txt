@@ -1,0 +1,40 @@
+# Progress is written in quiet moments. During a round that is once a minute.
+wait 600
+tap SEQ
+expect store_tries 0
+ask 1
+wait 40
+key 8 down
+key 12 down
+key 15 down
+wait 150
+expect lib_result 2
+key 8 up
+key 12 up
+key 15 up
+wait 1100
+expect lib_result 0
+expect progress_dirty 1
+wait 30000
+expect progress_dirty 1
+expect store_tries 0
+wait 30000
+expect progress_dirty 0
+expect store_tries 1
+
+# Away from an open question it goes at once. A save that fails is tried again after ten
+# seconds, not on every pass.
+flash_fail 1
+tap SAVE
+expect lib_result 3
+wait 1700
+expect progress_dirty 1
+expect store_tries 2
+wait 5000
+expect store_tries 2
+wait 5000
+expect store_tries 3
+flash_fail 0
+wait 10000
+expect progress_dirty 0
+expect store_tries 4

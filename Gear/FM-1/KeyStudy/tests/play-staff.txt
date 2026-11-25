@@ -1,0 +1,194 @@
+# Play from Staff: read the notes, play exactly what is written.
+wait 600
+tap SEQ
+tap GLO
+expect lib_page 1
+spin SELECT 1
+expect lib_menu_group 1
+tap EDIT
+expect lib_page 2
+expect lib_group 1
+expect lib_kind 0
+
+# The first note level stays inside the staff: nine positions, naturals only.
+expect lib_items 27
+ask 1
+wait 40
+expect lib_first_note 64
+expect lib_note_acc 0
+shot sight-note.png
+tapkey 11
+expect lib_result 2
+expect lib_first_try 1
+wait 1000
+
+# The written octave matters: the same letter an octave up is a miss.
+ask 1
+wait 40
+tapkey 23
+expect lib_result 1
+expect lib_misses 1
+tapkey 11
+expect lib_result 2
+expect lib_first_try 1
+wait 1000
+
+# Ledger lines widen the range to the whole panel, low F to high G.
+level 0 2
+expect lib_items 48
+ask 1
+wait 40
+expect lib_first_note 53
+ask 46
+wait 40
+expect lib_first_note 79
+
+# Sharps and flats come at level three; a note the panel lacks falls back to its natural.
+level 0 3
+ask 2
+wait 40
+expect lib_first_note 54
+expect lib_note_acc 1
+ask 0
+wait 40
+expect lib_first_note 53
+expect lib_note_acc 0
+
+# Key signatures come at level four: the plain note takes the signature's sharp.
+level 0 4
+level 4 2
+ask 1 1024
+wait 40
+expect lib_fifths 1
+expect lib_first_note 54
+expect lib_note_acc 1
+tapkey 0
+expect lib_result 1
+tapkey 1
+expect lib_result 2
+shot sight-note-in-g.png
+
+# A signature that would lift the panel's top key off the end is dropped for that note.
+ask 46 1536
+wait 40
+expect lib_fifths 0
+expect lib_first_note 79
+tapkey 26
+expect lib_result 2
+level 0 1
+level 4 1
+
+# An interval is two notes in order.
+spin SELECT 1
+expect lib_kind 2
+ask 86
+wait 40
+expect lib_note0 62
+expect lib_note1 69
+tapkey 9
+expect lib_position 1
+shot sight-interval.png
+tapkey 16
+expect lib_result 2
+wait 1000
+ask 86
+wait 40
+tapkey 21
+expect lib_result 1
+expect lib_position 0
+tapkey 9
+tapkey 16
+expect lib_result 2
+wait 1000
+
+# A scale is read note by note.
+spin SELECT 1
+expect lib_kind 3
+ask 0
+wait 40
+tapkey 7
+tapkey 9
+tapkey 11
+tapkey 12
+tapkey 14
+tapkey 16
+tapkey 18
+tapkey 19
+expect lib_result 2
+wait 1000
+
+# A written chord is held as written: an inversion of it is a different chord on the page.
+spin SELECT 1
+expect lib_kind 4
+ask 0
+wait 40
+expect lib_note0 60
+expect lib_note2 67
+key 11 down
+key 14 down
+key 19 down
+wait 140
+expect lib_result 1
+expect lib_wrong_keys 524288
+key 11 up
+key 14 up
+key 19 up
+wait 30
+key 7 down
+key 11 down
+key 14 down
+wait 140
+expect lib_result 2
+expect lib_first_try 0
+key 7 up
+key 11 up
+key 14 up
+wait 1000
+
+# At the top chord level the page shows inversions too.
+level 2 7
+expect lib_group 1
+expect lib_kind 4
+ask 0 1
+wait 40
+expect lib_inversion 1
+expect lib_note0 64
+expect lib_note2 72
+shot sight-chord-inversion.png
+key 11 down
+key 14 down
+key 19 down
+wait 140
+expect lib_result 2
+key 11 up
+key 14 up
+key 19 up
+wait 1000
+
+# Suspended chords stay in root position: turned over, sus4 on G would read as sus2 on C.
+ask 67 1
+wait 40
+expect lib_quality 5
+expect lib_inversion 0
+expect lib_note0 55
+
+# OCT+ moves the keys up an octave and the questions with them. The round starts over, since
+# the notes it had listed for review are numbered from the old lowest key.
+tap GLO
+spin PRESET -3
+tap EDIT
+expect lib_kind 0
+level 0 2
+tap SAVE
+expect lib_missed 1
+tap EDIT
+expect lib_seen 1
+tap OCT+
+expect base_key 65
+expect lib_seen 0
+expect lib_missed 0
+ask 1
+wait 40
+expect lib_first_note 65
+tapkey 0
+expect lib_result 2

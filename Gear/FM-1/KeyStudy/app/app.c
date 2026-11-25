@@ -3,11 +3,12 @@
 #include "theory.h"
 #include "library_theory.h"
 #include "preferences.h"
+#include "progress.h"
 
-enum { FIRST_KEY = 53, LAST_KEY = FIRST_KEY + NKEYS - 1, CHORD_SETTLE_MS = 90 };
-enum { PLAY_FROM_NAME, IDENTIFY_BY_EAR };
-enum { READY, WRONG, CORRECT, SKIPPED };
-enum { DEMO_OFF, DEMO_BLOCK, DEMO_STEPS };
+enum { PANEL_LOW = 53, CHORD_SETTLE_MS = 90 };
+enum { READY, WRONG, CORRECT, SKIPPED, MISSED };
+enum { DEMO_NOTES, DEMO_BLOCK, DEMO_CHORDS, DEMO_MELODY };
+enum { DEMO_MAX = 40 };
 
 typedef struct {
     uint32_t word[4];
@@ -19,45 +20,31 @@ typedef struct {
 } Question;
 
 static struct {
-    int practice;
-    int topic, learn_topic, practice_topic, practice_started, practice_refresh;
+    int practice;                 /* The PRACTICE tab is showing; the library holds its state. */
+    int topic;
     Question lesson[TOPIC_COUNT];
-    Question question;
-    int direction;
-    int mixed_chords;
-    uint32_t mixed_roots, mixed_qualities;
-    int choice;
-    int collect;
-    int hinted;
-    int missed;
-    int result;
-    int completed;
-    int correct;
-    int first_try;
-    int position;
-    int starting_note;
-    int wait_release;
-    int entry_changed;
+    int octave;                   /* OCT- and OCT+, in octaves from the clef's own register. */
     int dirty;
-    uint32_t collected;
-    uint32_t checked;
-    uint32_t stable_since;
     uint32_t rng;
     uint32_t panel;
     uint32_t buttons;
     uint32_t shared_usb_link;
     uint32_t held_pitches;
+    uint32_t sound_at;
     uint8_t pitch_count[12];
     uint16_t midi[NPORTS][128];
     NoteSet held;
     NoteSet demo_notes;
-    int demo;
-    uint32_t demo_at;
     char notice[50];
     uint32_t notice_at;
 } study;
 
-#include "library_state.h"
+/* Notes played for the player: steps in order, the notes of one step together. */
+static struct {
+    uint8_t note[DEMO_MAX], step[DEMO_MAX];
+    int count, steps;
+    uint32_t step_ms, gate_ms, at;
+} demo;
 
 static struct { int open, page; } guide;
 static NoteSet sound_notes;
@@ -69,46 +56,58 @@ static int keys_any(const NoteSet *notes)
 
 static int key_contains(const NoteSet *notes, int note)
 {
-    return (notes->word[note / 32] >> (note % 32)) & 1u;
+    return (unsigned)note < 128u && ((notes->word[note / 32] >> (note % 32)) & 1u);
 }
 
 static void key_add(NoteSet *notes, int note)
 {
-    notes->word[note / 32] |= 1u << (note % 32);
+    if ((unsigned)note < 128u)
+        notes->word[note / 32] |= 1u << (note % 32);
 }
 
-static int is_chord(void) { return study.topic == TRIADS || study.topic == SEVENTHS; }
-static int ear_mode(void) { return study.practice && study.direction == IDENTIFY_BY_EAR; }
-static int round_done(void)
+static int same_notes(const NoteSet *a, const NoteSet *b)
 {
-    return study.practice && study.completed >= prefs.length && study.result == READY;
-}
-static int question_open(void)
-{
-    return study.practice && !ear_mode() && !round_done()
-           && study.result != CORRECT && study.result != SKIPPED && !study.wait_release;
+    return a->word[0] == b->word[0] && a->word[1] == b->word[1] && a->word[2] == b->word[2] && a->word[3] == b->word[3];
 }
 
-static Question current(void)
+static int pitch_total(uint32_t pitches)
 {
-    return study.practice ? study.question : study.lesson[study.topic];
+    int count = 0;
+    while (pitches) {
+        pitches &= pitches - 1u;
+        ++count;
+    }
+    return count;
 }
 
-static const Shape *practice_shape(int quality)
+static int note_total(const NoteSet *notes)
 {
-    if (study.practice && study.mixed_chords)
-        return chord_shape(quality);
-    return topics[study.topic].shapes + quality;
+    return pitch_total(notes->word[0]) + pitch_total(notes->word[1]) + pitch_total(notes->word[2]) + pitch_total(notes->word[3]);
 }
 
-static uint32_t practice_filter(void)
+static int lowest_note(const NoteSet *notes)
 {
-    return study.mixed_chords ? prefs.chords : topic_filter(study.topic);
+    for (int note = 0; note < 128; ++note)
+        if (key_contains(notes, note))
+            return note;
+    return -1;
 }
 
-static const Shape *current_shape(void)
+/* The panel's lowest key. Bass clef reads an octave lower, so its notes sit on the staff. */
+static int base_key(void)
 {
-    return practice_shape(current().quality);
+    return PANEL_LOW + 12 * (study.octave - (prefs.clef == CLEF_BASS));
+}
+
+static int panel_key(int midi)
+{
+    return midi - base_key();
+}
+
+static uint32_t panel_bit(int midi)
+{
+    int key = panel_key(midi);
+    return (unsigned)key < NKEYS ? 1u << key : 0;
 }
 
 static int wrap_index(int index, int count)
@@ -117,33 +116,133 @@ static int wrap_index(int index, int count)
     return index < 0 ? index + count : index;
 }
 
-static char *append_text(char *out, const char *value)
+/* The staff's bottom line, in steps from written middle C. */
+static int staff_bottom(void)
 {
-    while (*value)
-        *out++ = *value++;
-    *out = 0;
-    return out;
+    return prefs.clef == CLEF_BASS ? -10 : 2;
+}
+
+/* Move a chord or a scale by octaves until its lowest note is in the panel's first octave: every
+ * close-position shape then fits the keys. */
+static void fit_notes(StaffNote *notes, int count)
+{
+    int lowest = notes[0].midi, distance, octaves;
+    for (int i = 1; i < count; ++i)
+        if (notes[i].midi < lowest)
+            lowest = notes[i].midi;
+    distance = base_key() - lowest;
+    octaves = distance >= 0 ? (distance + 11) / 12 : -(-distance / 12);
+    for (int i = 0; i < count; ++i) {
+        notes[i].midi += 12 * octaves;
+        notes[i].position += 7 * octaves;
+    }
 }
 
 static char *append_number(char *out, int n)
 {
-    if (n >= 10)
-        *out++ = (char)('0' + n / 10);
-    *out++ = (char)('0' + n % 10);
+    char digits[6];
+    int count = 0;
+    if (n < 0)
+        n = 0;
+    do {
+        digits[count++] = (char)('0' + n % 10);
+        n /= 10;
+    } while (n && count < 6);
+    while (count)
+        *out++ = digits[--count];
     *out = 0;
     return out;
 }
 
-static char *append_total(char *out, int value)
+static uint32_t next_random(void)
 {
-    return append_number(append_text(append_number(out, value), "/"), prefs.length);
+    uint32_t x = study.rng;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    study.rng = x;
+    return x;
+}
+
+/* The moment of every press goes into the generator: no two sessions ask in the same order. */
+static void stir_random(uint32_t now)
+{
+    study.rng ^= now * 2654435761u;
+    if (!study.rng)
+        study.rng = 0x3BE5F4A1u;
+    next_random();
+}
+
+static void demo_clear(void)
+{
+    demo.count = demo.steps = 0;
+    study.demo_notes = (NoteSet){{0}};
+}
+
+static void demo_add(int note, int step)
+{
+    if (demo.count < DEMO_MAX && (unsigned)note < 128u) {
+        demo.note[demo.count] = (uint8_t)note;
+        demo.step[demo.count++] = (uint8_t)step;
+        if (step >= demo.steps)
+            demo.steps = step + 1;
+    }
+}
+
+static void demo_start(uint32_t now, int pace)
+{
+    static const uint16_t step_ms[] = {300, 900, 800, 420}, gate_ms[] = {225, 860, 730, 340};
+    demo.step_ms = step_ms[pace];
+    demo.gate_ms = gate_ms[pace];
+    demo.at = now;
+    study.dirty = 1;
+}
+
+static int demo_playing(void)
+{
+    return demo.count != 0;
+}
+
+static uint32_t demo_length(void)
+{
+    return (uint32_t)demo.steps * demo.step_ms;
+}
+
+static void demo_tick(uint32_t now)
+{
+    NoteSet next = {{0}};
+    if (demo.count && demo.step_ms) {
+        uint32_t age = now - demo.at, step = age / demo.step_ms;
+        if (step >= (uint32_t)demo.steps) {
+            demo.count = demo.steps = 0;
+            study.dirty = 1;
+        } else if (age % demo.step_ms < demo.gate_ms) {
+            for (int i = 0; i < demo.count; ++i)
+                if (demo.step[i] == step)
+                    key_add(&next, demo.note[i]);
+        }
+    }
+    if (!same_notes(&next, &study.demo_notes))
+        study.dirty = 1;
+    study.demo_notes = next;
+}
+
+static int is_chord(void) { return study.topic == TRIADS || study.topic == SEVENTHS; }
+
+static Question current(void)
+{
+    return study.lesson[study.topic];
+}
+
+static const Shape *current_shape(void)
+{
+    return topics[study.topic].shapes + current().quality;
 }
 
 static void question_title(char out[24])
 {
-    Question q = current();
     const Shape *shape = current_shape();
-    char *p = append_text(out, root_name[q.root]);
+    char *p = append_text(out, root_label(current().root, shape));
     if (study.topic == INTERVALS)
         p = append_text(p, " + ");
     append_text(p, shape->symbol);
@@ -164,225 +263,52 @@ static void tone_list(char out[40])
 
 static int voiced_root(void)
 {
-    return FIRST_KEY + wrap_index(current().root - FIRST_KEY, 12);
+    return base_key() + wrap_index(current().root - base_key(), 12);
 }
 
-static void stop_demo(void)
+static void learn_demo(uint32_t now, int broken)
 {
-    study.demo = DEMO_OFF;
-    study.demo_notes = (NoteSet){{0}};
+    const Shape *shape = current_shape();
+    int together = is_chord() && !broken;
+    demo_clear();
+    for (int i = 0; i < shape->count; ++i)
+        demo_add(voiced_root() + shape->semitones[i], together ? 0 : i);
+    demo_start(now, together ? DEMO_BLOCK : DEMO_NOTES);
 }
 
-static void start_demo(uint32_t now, int broken)
-{
-    int together = is_chord() || (study.topic == INTERVALS && ear_mode() && prefs.order == HEAR_TOGETHER);
-    study.demo = broken || !together ? DEMO_STEPS : DEMO_BLOCK;
-    study.demo_at = now;
-}
-
-static void update_demo(uint32_t now)
-{
-    static const uint32_t step_ms = 285;
-    NoteSet next = {{0}};
-    if (study.demo) {
-        const Shape *shape = current_shape();
-        uint32_t age = now - study.demo_at;
-        int root = voiced_root();
-        if (study.demo == DEMO_BLOCK && age < 870) {
-            for (int i = 0; i < shape->count; ++i)
-                key_add(&next, root + shape->semitones[i]);
-        } else if (study.demo == DEMO_STEPS && age / step_ms < shape->count) {
-            if (age % step_ms < 220) {
-                unsigned step = age / step_ms;
-                if (study.topic == INTERVALS && ear_mode() && prefs.order == HEAR_DESCENDING)
-                    step = shape->count - 1u - step;
-                key_add(&next, root + shape->semitones[step]);
-            }
-        } else {
-            study.demo = DEMO_OFF;
-        }
-    }
-    for (int i = 0; i < 4; ++i) {
-        if (next.word[i] != study.demo_notes.word[i])
-            study.dirty = 1;
-    }
-    study.demo_notes = next;
-}
-
-static void clear_answer(uint32_t now)
-{
-    study.position = 0;
-    study.collected = 0;
-    study.checked = 0;
-    study.stable_since = now;
-    study.entry_changed = 0;
-    study.wait_release = 1;
-    if (study.result == WRONG)
-        study.result = READY;
-}
-
-static void prepare_question(uint32_t now)
-{
-    study.result = READY;
-    study.hinted = 0;
-    study.missed = 0;
-    study.choice = mask_choice(practice_filter(), 0);
-    study.dirty = 1;
-    stop_demo();
-    clear_answer(now);
-}
-
-static uint32_t next_random(void)
-{
-    uint32_t x = study.rng;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    study.rng = x;
-    return x;
-}
-
-static int unused_pick(uint32_t mask, uint32_t *used)
-{
-    uint32_t available = mask & ~*used;
-    if (!available) {
-        *used = 0;
-        available = mask;
-    }
-    int choice = mask_choice(available, next_random());
-    *used |= 1u << choice;
-    return choice;
-}
-
-static void mixed_question(void)
-{
-    int root = unused_pick(0xFFFu, &study.mixed_roots);
-    int quality = unused_pick(prefs.chords, &study.mixed_qualities);
-    study.question = (Question){root, quality};
-}
-
-static Question quick_question(uint32_t random)
-{
-    uint32_t qualities = practice_filter();
-    int count = mask_count(qualities);
-    int root = mask_choice(quiz_roots(study.topic == NOTES), random / (uint32_t)count);
-    return (Question){root, mask_choice(qualities, random)};
-}
-
-static void start_round(uint32_t now, int from_lesson)
-{
-    study.completed = 0;
-    study.correct = 0;
-    study.first_try = 0;
-    if (study.mixed_chords) {
-        study.mixed_roots = study.mixed_qualities = 0;
-        mixed_question();
-    } else {
-        uint32_t random = next_random();
-        Question lesson = study.lesson[study.topic];
-        int permitted = (practice_filter() & (1u << lesson.quality)) &&
-                        (quiz_roots(study.topic == NOTES) & (1u << lesson.root));
-        study.question = from_lesson && permitted && !ear_mode() ? lesson : quick_question(random);
-    }
-    prepare_question(now);
-}
-
-static void next_question(uint32_t now)
-{
-    if (study.completed < prefs.length && study.mixed_chords) {
-        mixed_question();
-    } else if (study.completed < prefs.length) {
-        Question next = quick_question(next_random());
-        if (next.root == study.question.root && next.quality == study.question.quality)
-            next.root = mask_step(quiz_roots(study.topic == NOTES), next.root, 1);
-        study.question = next;
-    }
-    prepare_question(now);
-}
-
-static void conclude_answer(int result)
-{
-    ++study.completed;
-    study.result = result;
-    if (result == CORRECT) {
-        ++study.correct;
-        if (!study.missed && !study.hinted)
-            ++study.first_try;
-    }
-    study.dirty = 1;
-    stop_demo();
-}
-
-static void mark_wrong(void)
-{
-    study.result = WRONG;
-    study.missed = 1;
-    study.dirty = 1;
-}
+#include "library_state.h"
+#include "calculators.h"
 
 static int is_held(int note)
 {
-    int key = note - FIRST_KEY;
-    return ((unsigned)key < NKEYS && (study.panel & (1u << key)))
-           || study.midi[PORT_USB][note] || study.midi[PORT_TRS][note];
-}
-
-static void answer_note(int note, uint32_t now)
-{
-    if (!question_open() || study.demo)
-        return;
-
-    const Shape *shape = current_shape();
-    if (is_chord()) {
-        study.result = READY;
-        if (study.collect)
-            study.collected ^= pitch_bit(note);
-        study.stable_since = now;
-        study.dirty = 1;
-        return;
-    }
-
-    if (!study.position) {
-        if (note % 12 != study.question.root || note + shape->semitones[shape->count - 1] > 127) {
-            mark_wrong();
-            return;
-        }
-        study.starting_note = note;
-    } else if (note != study.starting_note + shape->semitones[study.position]) {
-        mark_wrong();
-        study.position = 0;
-        return;
-    }
-    study.result = READY;
-    ++study.position;
-    study.dirty = 1;
-    if (study.position == shape->count)
-        conclude_answer(CORRECT);
+    return (study.panel & panel_bit(note)) || study.midi[PORT_USB][note] || study.midi[PORT_TRS][note];
 }
 
 static void update_held(int note, uint32_t now)
 {
-    int down = is_held(note);
+    if ((unsigned)note >= 128u)
+        return;
+    int down = is_held(note), pitch = note % 12;
     if (down == key_contains(&study.held, note))
         return;
-    int pitch = note % 12;
     if (down) {
         key_add(&study.held, note);
         if (!study.pitch_count[pitch]++)
             study.held_pitches |= 1u << pitch;
+        stir_random(now);
         if (!settings.open) {
-            if (library.page != LIB_CLOSED)
-                library_key(note);
+            if (study.practice)
+                library_key(note, now);
             else
-                answer_note(note, now);
+                calc_key(note);
         }
     } else {
         study.held.word[note / 32] &= ~(1u << (note % 32));
         if (!--study.pitch_count[pitch])
             study.held_pitches &= ~(1u << pitch);
     }
-    study.stable_since = now;
-    study.entry_changed = 1;
+    library.stable_since = now;
+    library.entry_changed = 1;
     study.dirty = 1;
 }
 
@@ -396,13 +322,25 @@ static void clear_midi_source(int port, uint16_t channels, uint32_t now)
     }
 }
 
+/* The panel's keys change pitch with the register: let go of what they hold first. */
+static void release_panel(uint32_t now)
+{
+    uint32_t keys = study.panel;
+    int base = base_key();
+    study.panel = 0;
+    for (int k = 0; k < NKEYS; ++k)
+        if (keys & (1u << k))
+            update_held(base + k, now);
+}
+
 static void read_keyboard(uint32_t now)
 {
     uint32_t keys = plat_keys(), changed = keys ^ study.panel;
+    int base = base_key();
     study.panel = keys;
     for (int k = 0; k < NKEYS; ++k) {
         if (changed & (1u << k))
-            update_held(FIRST_KEY + k, now);
+            update_held(base + k, now);
     }
     uint32_t link = plat_midi_out_link();
     if (plat_usb_lost() || link != study.shared_usb_link)
@@ -428,38 +366,8 @@ static void read_keyboard(uint32_t now)
             clear_midi_source(port, channel, now);
         }
     }
-    if (!keys_any(&study.held)) {
-        study.wait_release = 0;
+    if (!keys_any(&study.held))
         library.wait_release = 0;
-    }
-}
-
-static uint32_t chord_entry(void)
-{
-    return study.collect ? study.collected : study.held_pitches;
-}
-
-static int pitch_total(uint32_t pitches)
-{
-    int count = 0;
-    while (pitches) {
-        pitches &= pitches - 1u;
-        ++count;
-    }
-    return count;
-}
-
-static void check_chord(int submit)
-{
-    uint32_t entry = chord_entry();
-    const Shape *shape = current_shape();
-    if (entry == shape_pitches(current().root, shape)) {
-        conclude_answer(CORRECT);
-    } else if (entry && (submit || pitch_total(entry) >= shape->count)
-               && (study.result != WRONG || entry != study.checked)) {
-        study.checked = entry;
-        mark_wrong();
-    }
 }
 
 #include "library.h"
@@ -471,127 +379,60 @@ static void read_controls(uint32_t now)
     uint32_t buttons = plat_buttons();
     uint32_t press = buttons & ~study.buttons;
     study.buttons = buttons;
-    int topic = plat_enc(EN_SELECT);
+    int select = plat_enc(EN_SELECT);
     int algo = plat_enc(EN_ALGO);
     int preset = plat_enc(EN_PRESET);
+    int k1 = plat_enc(EN_K1), k2 = plat_enc(EN_K2);
+    if (press)
+        stir_random(now);
+
     if (press & ((1u << B_HOME) | (1u << B_SEQ))) {
+        /* A note an outside keyboard never released would hold every question up: let go of them. */
+        clear_midi_source(PORT_USB, 0xFFFFu, now);
+        clear_midi_source(PORT_TRS, 0xFFFFu, now);
         settings.open = 0;
         guide.open = 0;
-        library.page = LIB_CLOSED;
-        library_silence();
-        stop_demo();
-        study.entry_changed = 0;
-        study.wait_release = 1;
+        calc.page = LIB_CLOSED;
+        demo_clear();
+        library.wait_release = 1;
+        study.practice = (press & (1u << B_SEQ)) != 0;
+        if (study.practice && library.page == LIB_CLOSED)
+            library_start(now);
         study.dirty = 1;
-        if (press & (1u << B_HOME)) {
-            if (study.practice) {
-                study.practice_topic = study.topic;
-                study.topic = study.learn_topic;
-                study.practice = 0;
-            }
-        } else {
-            if (!study.practice) {
-                study.learn_topic = study.topic;
-                study.topic = study.practice_topic;
-                study.practice = 1;
-            }
-            if (!study.practice_started || study.practice_refresh) {
-                if (!study.practice_started || !practice_filter())
-                    study.mixed_chords = is_chord();
-                if (!study.practice_started)
-                    study.direction = PLAY_FROM_NAME;
-                study.practice_started = 1;
-                study.practice_refresh = 0;
-                start_round(now, 0);
-            }
-        }
         return;
     }
-    if (settings_controls(press, now, topic, preset) || guide_controls(press, now, topic) ||
-        library_controls(press, now, topic, algo, preset))
+    if (settings_controls(press, now, select, preset))
         return;
-    if (topic) {
-        study.mixed_chords = 0;
-        if (study.practice) {
-            uint32_t topics_available = 0;
-            for (int i = 0; i < TOPIC_COUNT; ++i)
-                if (topic_filter(i))
-                    topics_available |= 1u << i;
-            study.topic = mask_step(topics_available, study.topic, topic);
-        } else {
-            study.topic = wrap_index(study.topic + topic, TOPIC_COUNT);
+    if (press & ((1u << B_OCTDN) | (1u << B_OCTUP))) {
+        int octave = clamp(study.octave + ((press & (1u << B_OCTUP)) ? 1 : -1), -1, 1);
+        if (octave != study.octave) {
+            release_panel(now);
+            study.octave = octave;
+            demo_clear();
+            library_register(now);
+            calc_refresh();
         }
-        if (study.practice && study.topic == NOTES)
-            study.direction = PLAY_FROM_NAME;
-        if (study.practice)
-            start_round(now, 1);
-        study.dirty = 1;
-        stop_demo();
-    }
-    if (!study.practice) {
-        Question *q = &study.lesson[study.topic];
-        if (algo || preset) {
-            q->quality = wrap_index(q->quality + algo, topics[study.topic].count);
-            q->root = wrap_index(q->root + preset, 12);
-            stop_demo();
-            study.dirty = 1;
-        }
-        if (press & ((1u << B_PLAY) | (1u << B_ARP)))
-            start_demo(now, (press & (1u << B_ARP)) != 0);
+        app_say("Keys from", octave < 0 ? "one octave down" : octave ? "one octave up" : "the middle");
         return;
     }
+    if (library_controls(press, now, select, algo, preset) || guide_controls(press, now, select) ||
+        calc_controls(press, now, select, algo, preset, k1, k2))
+        return;
 
-    if (study.topic != NOTES && algo % 2) {
-        study.direction ^= 1;
-        start_round(now, 0);
-    }
-    if (ear_mode() && preset && !round_done() && study.result != CORRECT && study.result != SKIPPED) {
-        study.choice = mask_step(practice_filter(), study.choice, preset);
-        study.result = READY;
+    if (select) {
+        study.topic = wrap_index(study.topic + select, TOPIC_COUNT);
+        demo_clear();
         study.dirty = 1;
     }
-    if (press & (1u << B_EDIT)) {
-        if (round_done()) {
-            start_round(now, 0);
-            return;
-        }
-        if (study.result == CORRECT || study.result == SKIPPED) {
-            next_question(now);
-            return;
-        }
-        if (ear_mode()) {
-            if (study.choice == study.question.quality)
-                conclude_answer(CORRECT);
-            else
-                mark_wrong();
-        } else if (question_open() && is_chord() && !study.demo) {
-            check_chord(1);
-        }
-    }
-    if (round_done())
-        return;
-    if ((press & (1u << B_FX)) && study.result != CORRECT && study.result != SKIPPED) {
-        study.hinted = 1;
+    Question *q = &study.lesson[study.topic];
+    if (algo || preset) {
+        q->quality = wrap_index(q->quality + algo, topics[study.topic].count);
+        q->root = wrap_index(q->root + preset, 12);
+        demo_clear();
         study.dirty = 1;
     }
-    if ((press & (1u << B_SAVE)) && study.result != CORRECT && study.result != SKIPPED)
-        conclude_answer(SKIPPED);
-    if (press & (1u << B_PLAY)) {
-        if (!ear_mode() && study.result != CORRECT && study.result != SKIPPED) {
-            study.hinted = 1;
-            clear_answer(now);
-        }
-        start_demo(now, 0);
-    }
-    if ((press & (1u << B_ARP)) && is_chord() && !ear_mode()) {
-        study.collect ^= 1;
-        clear_answer(now);
-        study.dirty = 1;
-    }
-    if ((press & (1u << B_REC)) && question_open() && is_chord() && study.collect) {
-        clear_answer(now);
-        study.dirty = 1;
-    }
+    if (press & ((1u << B_PLAY) | (1u << B_ARP)))
+        learn_demo(now, (press & (1u << B_ARP)) != 0);
 }
 
 static void tick_study(void)
@@ -599,28 +440,22 @@ static void tick_study(void)
     uint32_t now = plat_ms();
     read_controls(now);
     read_keyboard(now);
-    if (settings.open) {
-        study.demo_notes = (NoteSet){{0}};
-    } else if (library.page != LIB_CLOSED || guide.open)
-        library_audio(now);
-    else
-        update_demo(now);
-    if (!settings.open && library.page == LIB_CLOSED && study.entry_changed && question_open() && is_chord() && !study.demo
-        && now - study.stable_since >= CHORD_SETTLE_MS) {
-        study.entry_changed = 0;
-        check_chord(0);
-    }
+    if (settings.open)
+        demo_clear();
+    demo_tick(now);
+    library_tick(now);
 
     NoteSet next = study.held;
     for (int i = 0; i < 4; ++i)
         next.word[i] |= study.demo_notes.word[i];
-    for (int i = 0; i < 4; ++i) {
-        if (sound_notes.word[i] != next.word[i]) {
-            uint32_t lock = plat_lock();
-            sound_notes = next;
-            plat_unlock(lock);
-            break;
-        }
+    if (keys_any(&next))
+        study.sound_at = now;
+    if (now - study.sound_at > 1500u && progress_save_due(now, library_answering()))
+        save_progress(now);
+    if (!same_notes(&sound_notes, &next)) {
+        uint32_t lock = plat_lock();
+        sound_notes = next;
+        plat_unlock(lock);
     }
 }
 
@@ -629,10 +464,13 @@ static void tick_study(void)
 void app_init(void)
 {
     load_preferences();
-    guide.open = guide.page = 0;
-    study.topic = study.learn_topic = study.practice_topic = SEVENTHS;
+    load_progress();
+    study.topic = SEVENTHS;
     study.lesson[SEVENTHS] = (Question){11, 1};
     study.rng = 0x3BE5F4A1u;
+    library.group = LIB_NAME;
+    library.item = 3;                 /* SEQ opens on chords, played from their names */
+    library.last_item = -1;
     sound_init();
 }
 

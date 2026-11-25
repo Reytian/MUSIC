@@ -11,16 +11,27 @@ typedef struct {
 #define SCORE_RULE RGB(109, 123, 118)
 #define SCORE_INK RGB(22, 36, 40)
 #define SCORE_ACTIVE RGB(0, 110, 83)
+#define SCORE_WRONG RGB(196, 52, 40)
 
 enum {
     STAFF_SPACE = 6,
     STAFF_SPAN = 4 * STAFF_SPACE,
     STAFF_LEFT = 22,
     STAFF_RIGHT = 222,
-    SCORE_CENTER = 136,
     SCORE_HEIGHT = 78,
     SCORE_KEYS_Y = 96,
 };
+
+/* What to draw: a run of notes, one chord, or chords side by side. A bit in filled, done or wrong
+ * speaks for the note of that index. */
+typedef struct {
+    const StaffNote *notes;
+    const uint8_t *column;        /* the chord each note belongs to, for chords side by side */
+    int count, columns;
+    int stacked;                  /* whole notes in a stack; else quarter notes in a row */
+    uint32_t filled, done, wrong;
+    int fifths, cursor, live;
+} Score;
 
 typedef struct {
     int top;
@@ -49,16 +60,16 @@ static int note_row(StaffLayout staff, StaffNote note)
     return staff.top + (staff.top_position - note.position) * (STAFF_SPACE / 2);
 }
 
-static StaffLayout staff_layout(const StaffNote *notes, int count, int filled, int fifths, int cursor)
+static StaffLayout staff_layout(const Score *score)
 {
     StaffLayout staff = {.bass = prefs.clef == CLEF_BASS};
     staff.top_position = staff.bass ? -2 : 10;
     int first_row = staff.bass ? 0 : -8;
-    int last_row = staff.bass && !fifths ? STAFF_SPAN : 34;
-    for (int i = 0; i < count; ++i) {
-        if (!(filled & (1 << i)) && i != cursor)
+    int last_row = staff.bass && !score->fifths ? STAFF_SPAN : 34;
+    for (int i = 0; i < score->count; ++i) {
+        if (!(score->filled & (1u << i)) && i != score->cursor)
             continue;
-        int row = note_row(staff, notes[i]);
+        int row = note_row(staff, score->notes[i]);
         if (row - 11 < first_row)
             first_row = row - 11;
         if (row + 8 > last_row)
@@ -86,10 +97,11 @@ static void draw_note_head(StaffLayout staff, StaffNote note, int x, int chord, 
 {
     int y = note_row(staff, note);
     int bottom = staff.top + STAFF_SPAN;
+    int reach = chord ? 8 : 6;
     for (int ledger = staff.top - STAFF_SPACE; ledger >= y; ledger -= STAFF_SPACE)
-        cv_rect(x - 8, ledger, 17, 1, SCORE_INK);
+        cv_rect(x - reach, ledger, 2 * reach + 1, 1, SCORE_INK);
     for (int ledger = bottom + STAFF_SPACE; ledger <= y; ledger += STAFF_SPACE)
-        cv_rect(x - 8, ledger, 17, 1, SCORE_INK);
+        cv_rect(x - reach, ledger, 2 * reach + 1, 1, SCORE_INK);
 
     if (chord) {
         cv_rect(x - 4, y - 1, 9, 2, SCORE_PAPER);
@@ -143,32 +155,47 @@ static void draw_key_signature(StaffLayout staff, int fifths)
         staff_symbol(symbol, 48 + 8 * i, note_row(staff, (StaffNote){.position = positions[i]}), SCORE_INK);
 }
 
-static void draw_notation(const StaffNote *notes, int count, int filled, int stacked, int fifths, int cursor, int live)
+static void draw_notation(const Score *score)
 {
-    int center = fifths ? 160 : SCORE_CENTER;
-    int gap = count > 1 ? clamp(150 / (count - 1), 0, 49) : 0;
-    int first_x = center - gap * (count - 1) / 2;
-    int columns[4] = {120, 120, 120, 120};
-    int previous = -20, shift = 0;
+    int signs = score->fifths < 0 ? -score->fifths : score->fifths;
+    int left = signs ? 62 + 8 * signs : 61, right = STAFF_RIGHT - 11;
+    int slots = score->stacked ? (score->columns > 1 ? score->columns : 1) : score->count;
+    int gap = slots > 1 ? clamp((right - left) / (slots - 1), 0, 49) : 0;
+    int first_x = (left + right) / 2 - gap * (slots - 1) / 2;
+    int columns[4], previous = -20, shift = 0, group = -1;
 
-    StaffLayout staff = staff_layout(notes, count, filled, fifths, cursor);
+    StaffLayout staff = staff_layout(score);
     cv_band(0, SCORE_HEIGHT);
     draw_staff(staff);
-    draw_key_signature(staff, fifths);
-    for (int i = 0; i < count; ++i) {
-        int exists = filled & (1 << i);
-        if (!exists && i != cursor)
+    draw_key_signature(staff, score->fifths);
+    for (int i = 0; i < score->count; ++i) {
+        int exists = (score->filled >> i) & 1u;
+        if (!exists && i != score->cursor)
             continue;
-        StaffNote note = notes[i];
-        int sounding = live && (key_contains(&study.demo_notes, note.midi) || key_contains(&study.held, note.midi));
-        uint16_t ink = !exists ? SCORE_RULE : ((i == cursor || sounding) ? SCORE_ACTIVE : SCORE_INK);
-        int accidental = written_accidental(note, fifths);
-        if (stacked) {
+        StaffNote note = score->notes[i];
+        int sounding = score->live && (key_contains(&study.demo_notes, note.midi) || key_contains(&study.held, note.midi));
+        uint16_t ink = SCORE_INK;
+        if (!exists)
+            ink = SCORE_RULE;
+        else if ((score->wrong >> i) & 1u)
+            ink = SCORE_WRONG;
+        else if (i == score->cursor || sounding || ((score->done >> i) & 1u))
+            ink = SCORE_ACTIVE;
+        int accidental = written_accidental(note, score->fifths);
+        if (score->stacked) {
+            int slot = score->column && score->columns > 1 ? score->column[i] : 0;
+            int x = first_x + slot * gap;
+            if (slot != group) {
+                group = slot;
+                previous = -20;
+                shift = 0;
+                for (int c = 0; c < 4; ++c)
+                    columns[c] = 120;
+            }
             /* Offset adjacent heads so seconds stay distinct. */
             shift = note.position == previous + 1 ? 9 - shift : 0;
-            int offset = i == cursor && !exists ? 9 : shift;
-            draw_note_head(staff, note, center + offset, 1, ink);
-            draw_accidental(staff, note, accidental, center - 9, columns);
+            draw_note_head(staff, note, x + (i == score->cursor && !exists ? 9 : shift), 1, ink);
+            draw_accidental(staff, note, accidental, x - 9, columns);
         } else {
             int x = first_x + i * gap;
             draw_note_head(staff, note, x, 0, ink);
@@ -177,13 +204,4 @@ static void draw_notation(const StaffNote *notes, int count, int filled, int sta
         previous = note.position;
     }
     cv_band(0, LOWER_HEIGHT);
-}
-
-static void draw_score(void)
-{
-    const Shape *shape = current_shape();
-    StaffNote notes[8], root = canonical_note(voiced_root());
-    for (int i = 0; i < shape->count; ++i)
-        notes[i] = shape_note(root, shape, i);
-    draw_notation(notes, shape->count, (1 << shape->count) - 1, is_chord(), 0, -1, 1);
 }

@@ -1,0 +1,163 @@
+# Keyboard Identification and Ear Training: answers chosen from the grid.
+wait 600
+tap SEQ
+tap ENV
+spin SELECT 5
+spin PRESET 1
+tap SAVE
+expect pref_guided 0
+tap GLO
+spin SELECT 6
+tap EDIT
+expect lib_group 6
+expect lib_kind 0
+
+# A lit key answers to either of its names.
+ask 9 0
+wait 40
+expect lib_guides 16
+spin PRESET 5
+tap EDIT
+expect lib_result 2
+wait 1000
+ask 1 0
+wait 40
+expect lib_first_note 61
+spin ALGO 1
+tap EDIT
+expect lib_result 2
+wait 1000
+ask 1 0
+wait 40
+spin PRESET 1
+spin ALGO -1
+shot keys-note.png
+tap EDIT
+expect lib_result 2
+expect lib_first_try 3
+wait 1000
+
+# On the keys there is one tritone, whatever its spelling.
+spin SELECT 1
+expect lib_kind 2
+ask 60
+wait 40
+expect lib_guides 8320
+spin PRESET 5
+expect lib_choice 5
+spin PRESET 1
+expect lib_choice 7
+spin PRESET -1
+tap EDIT
+expect lib_result 2
+wait 1000
+
+# A lit scale and a lit chord mark their root.
+spin SELECT 1
+expect lib_kind 3
+ask 12
+wait 40
+expect lib_anchors 128
+spin PRESET 1
+tap EDIT
+expect lib_result 2
+wait 1000
+spin SELECT 1
+expect lib_kind 4
+ask 12
+wait 40
+expect lib_anchors 128
+expect lib_guides 17536
+spin PRESET 1
+shot keys-chord.png
+tap EDIT
+expect lib_result 2
+wait 1000
+
+# Ear Training: the question plays; the lights stay dark until it is answered.
+tap GLO
+spin SELECT 1
+tap EDIT
+expect lib_group 7
+expect lib_kind 0
+wait 1200
+ask 4
+wait 40
+tap PLAY
+wait 20
+expect demo 2
+expect lib_says_playing 1
+expect lib_lights 0
+expect lib_hinted 0
+
+# When the sound ends the screen stops saying it is playing.
+wait 700
+expect demo 0
+expect lib_says_playing 0
+spin PRESET 2
+tap EDIT
+expect lib_result 2
+wait 1000
+
+# A wrong choice is played back beside the question: the reference and the guess, then the real pair.
+wait 1200
+ask 4
+wait 40
+spin PRESET 1
+tap EDIT
+expect lib_result 1
+expect demo 4
+expect lib_lights 0
+shot ear-compare.png
+wait 1700
+expect demo 0
+spin PRESET 1
+tap EDIT
+expect lib_result 2
+expect lib_first_try 1
+wait 1000
+
+# A second miss gives the answer, heard once more and shown.
+spin SELECT 1
+expect lib_kind 2
+wait 1200
+ask 86
+wait 40
+tap EDIT
+expect lib_result 1
+expect demo 4
+expect lib_tried 1
+wait 1700
+spin PRESET 1
+tap EDIT
+expect lib_result 4
+expect lib_revealed 1
+expect demo 2
+expect lib_guides 66048
+shot ear-missed.png
+wait 800
+tap EDIT
+expect lib_result 0
+
+# Chords and scales by ear ask for the type alone.
+spin SELECT 2
+expect lib_kind 4
+wait 1500
+ask 12
+wait 40
+tap EDIT
+expect lib_result 1
+expect demo 6
+wait 2800
+spin PRESET 1
+tap EDIT
+expect lib_result 2
+wait 1000
+spin SELECT -1
+expect lib_kind 3
+wait 3000
+ask 33
+wait 40
+spin PRESET 2
+tap EDIT
+expect lib_result 2

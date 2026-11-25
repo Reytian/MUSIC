@@ -12,7 +12,7 @@ static void guide_frame(uint32_t now)
     if (!study.dirty)
         return;
     study.dirty = 0;
-    plat_lights((1u << B_HOME) | (library.demo_count ? LED_PLAY_GREEN : 0),
+    plat_lights((1u << B_HOME) | (demo_playing() ? LED_PLAY_GREEN : 0),
                 study.panel | demo_lights(), (1u << B_PLAY) | (1u << B_SEL), 0, 2);
 
     cv_begin(240, TOP_HEIGHT, STUDY_BG);

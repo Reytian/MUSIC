@@ -1,104 +1,233 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-static char *library_pitch_text(char *out, StaffNote note, int show_octave)
+static char *note_text(char *out, StaffNote note, int show_octave)
 {
     int letter = positive_mod(note.position, 7);
-    *out++ = "CDEFGAB"[letter];
-    int accidental = note.accidental;
-    while (accidental < 0) {
-        *out++ = 'b';
-        ++accidental;
-    }
-    while (accidental > 0) {
-        *out++ = '#';
-        --accidental;
-    }
-    *out = 0;
+    out = spell_text(out, letter, note.accidental);
     if (show_octave)
         out = append_number(out, 4 + (note.position - letter) / 7);
     return out;
 }
 
-static void library_key_text(char *out, int fifths)
+static char *key_text(char *out, int fifths, int minor)
 {
-    append_text(append_text(out, library_key_name(fifths)), library.minor ? " minor" : " major");
+    return append_text(append_text(out, key_name(fifths + 7 + (minor ? 15 : 0))), minor ? " minor" : " major");
 }
 
+static void draw_ring(int x, int y, int slashed, uint16_t color)
+{
+    cv_rect(x + 2, y, 3, 1, color);
+    cv_rect(x + 2, y + 6, 3, 1, color);
+    cv_rect(x, y + 2, 1, 3, color);
+    cv_rect(x + 6, y + 2, 1, 3, color);
+    cv_rect(x + 1, y + 1, 1, 1, color);
+    cv_rect(x + 5, y + 1, 1, 1, color);
+    cv_rect(x + 1, y + 5, 1, 1, color);
+    cv_rect(x + 5, y + 5, 1, 1, color);
+    if (slashed)
+        cv_line(x - 1, y + 7, x + 7, y - 1, color);
+}
+
+/* A numeral as a harmony book sets it: the quality mark raised, the figured bass stacked. */
+static int draw_roman(int x, int y, const RomanLabel *label, uint16_t color)
+{
+    char figure[2] = {0, 0};
+    x = cv_text(x, y, &FONT_M, label->numeral, color);
+    if (label->mark == MARK_AUG) {
+        x = cv_text(x + 1, y + 1, &FONT_B, "+", color);
+    } else if (label->mark) {
+        draw_ring(x + 2, y + 5, label->mark == MARK_HALF_DIM, color);
+        x += 11;
+    }
+    if (label->suffix[0] == 's')
+        x = cv_text(x + 2, y + 7, &FONT_B, label->suffix, color);
+    else if (label->suffix[0])
+        x = cv_text(x + 1, y + 2, &FONT_T, label->suffix, color);
+    for (int i = 0; i < 2; ++i) {
+        if (label->figure[i]) {
+            figure[0] = label->figure[i];
+            cv_text(x + 1, y + 2 + 11 * i, &FONT_T, figure, color);
+        }
+    }
+    return x + (label->figure[0] ? 8 : 0);
+}
+
+static RomanLabel progression_label(int step)
+{
+    const Progression *progression = &progressions[library.quality];
+    return roman_label(library.fifths, library.minor, progression->degree[step], 0, progression->type[step], 0);
+}
+
+static const char *tritone_or(const Shape *shape)
+{
+    return one_tritone() && shape == &intervals[INTERVAL_A4] ? "TT" : shape->symbol;
+}
+
+/* What the question is, in words: the prompt of a name question, the answer of the others. */
 static void library_target_title(char *out)
 {
     int kind = library_kind();
+    char *p = out;
     if (kind == ITEM_SIGNATURE) {
-        library_key_text(out, library.fifths);
-    } else if (kind == ITEM_NOTE || library_is_direct() || kind == ITEM_ACCIDENTAL) {
-        library_pitch_text(out, library.target[0], 1);
+        key_text(out, library.fifths, library.minor);
+    } else if (kind == ITEM_NOTE) {
+        note_text(out, library.target[0], written_notes());
+    } else if (kind == ITEM_MELODY) {
+        key_text(append_text(out, "Melody in "), library.fifths, 0);
+    } else if (kind == ITEM_DEGREE) {
+        append_number(append_text(out, "Degree "), library.degree + 1);
     } else if (kind == ITEM_ROMAN) {
-        static const char *const upper[] = {"I", "II", "III", "IV", "V", "VI", "VII"};
-        static const char *const lower[] = {"i", "ii", "iii", "iv", "v", "vi", "vii"};
-        StaffNote base[4];
-        roman_notes(base, library.fifths, library.minor, library.degree, library.alteration,
-                    library.quality, 0, library.count);
-        int third = base[1].midi - base[0].midi;
-        int fifth = base[2].midi - base[0].midi;
-        char *end = append_text(out, library.alteration < 0 ? "b" : (library.alteration > 0 ? "#" : ""));
-        end = append_text(end, third == 3 ? lower[library.degree] : upper[library.degree]);
-        if (fifth == 6)
-            end = append_text(end, library.count == 4 && base[3].midi - base[0].midi == 10 ? "hdim" : "dim");
-        else if (fifth == 8)
-            end = append_text(end, "aug");
-        else if (third == 2 || third == 5)
-            end = append_text(end, third == 2 ? "sus2" : "sus4");
-        if (library.count == 4) {
-            int seventh = base[3].midi - base[0].midi;
-            end = append_text(end, seventh == 11 ? "maj7" : "7");
+        RomanLabel label = roman_label(library.fifths, library.minor, library.degree, 0, library.type, 0);
+        roman_text(out, &label);
+    } else if (kind == ITEM_PROGRESSION) {
+        for (int step = 0; step < library.steps; ++step) {
+            RomanLabel label = progression_label(step);
+            p = roman_text(step ? append_text(p, " ") : p, &label);
         }
-        if (library.inversion)
-            append_number(append_text(end, " / "), library.inversion);
-    } else if (kind == ITEM_MATRIX) {
-        append_text(out, "12-Tone Matrix");
     } else {
         const Shape *shape = library_shape(kind, library.quality);
-        char *end = library_pitch_text(out, library.target[0], 0);
+        p = append_text(out, root_label(library.root, shape));
         if (kind == ITEM_INTERVAL)
-            end = append_text(end, " + ");
-        append_text(end, shape->symbol);
+            p = append_text(p, " + ");
+        p = append_text(p, tritone_or(shape));
+        if (kind == ITEM_INVERSION)
+            note_text(append_text(p, "/"), library.target[0], 0);
     }
 }
 
-static void library_choice_text(char *out)
+static const char *library_prompt_title(void)
+{
+    static const char *const name_it[] = {"Name the note", "Name the key", "Name the interval", "Name the scale", "Name the chord"};
+    int kind = library_kind();
+    if (library_prompt() == PROMPT_SOUND)
+        return "Listen";
+    if (library_prompt() == PROMPT_KEYS)
+        return kind == ITEM_NOTE ? "Name the lit key" : "Name the lit keys";
+    if (library_answer() == ANSWER_PLAY)
+        return "Play what is written";
+    if (kind == ITEM_SIGNATURE)
+        return library.minor ? "Name the minor key" : "Name the major key";
+    return name_it[kind];
+}
+
+static const char playing_text[] = "Playing...";
+static int drawn_playing;            /* the last card drawn said playing_text (for the tests) */
+
+static const char *library_instruction(void)
+{
+    int kind = library_kind(), mode = play_mode(), sound = library_prompt() == PROMPT_SOUND;
+    if (sound && (demo_playing() || library.autoplay_at))
+        return playing_text;
+    if (library_answer() == ANSWER_WRITE)
+        return kind == ITEM_SIGNATURE ? "Set the sharps or flats" : "Write it on the staff";
+    if (library_answer() == ANSWER_CHOICE)
+        return sound ? "Choose what you heard" : "Choose, then press EDIT";
+    if (kind == ITEM_PROGRESSION)
+        return "Hold each chord, lifting between";
+    if (kind == ITEM_INVERSION)
+        return "Hold it with that note lowest";
+    if (mode == PLAY_PITCH_SET && library.collect)
+        return "Tap notes to add or remove";
+    if (sound && kind == ITEM_NOTE)
+        return "C sounded first: play the other";
+    if (sound)
+        return mode == PLAY_EXACT ? "Play it back from the lit key" : "Hold it, starting on the lit key";
+    if (mode == PLAY_PITCH_SET)
+        return "Hold all the chord tones";
+    if (mode == PLAY_EXACT_SET)
+        return "Hold the written keys";
+    return library.count > 1 ? "Play the notes going up" : "Play it on the keys";
+}
+
+static uint32_t library_all_keys(void)
+{
+    uint32_t keys = 0;
+    for (int i = 0; i < library.count; ++i)
+        keys |= panel_bit(library.target[i].midi);
+    return keys;
+}
+
+static uint32_t library_guide_keys(void)
+{
+    if (library.over || library_kind() == ITEM_PROGRESSION)
+        return 0;
+    return library_revealed() || library_prompt() == PROMPT_KEYS ? library_all_keys() : 0;
+}
+
+/* Keys marked without giving the answer away: where to start, a chord's root, notes tapped in. */
+static uint32_t library_anchor_keys(void)
 {
     int kind = library_kind();
-    if (kind == ITEM_NOTE) {
-        library_pitch_text(out, library_note_option(library.choice), 0);
-    } else if (kind == ITEM_SIGNATURE) {
-        library_key_text(out, library.choice);
-    } else if (kind == ITEM_CHORD && library.group != LIB_EAR) {
-        const Shape *shape = chord_shape(library.choice);
-        char *end = append_text(out, root_name[library.typed_position]);
-        append_text(end, shape->symbol);
-    } else {
-        append_text(out, library_shape(kind, library.choice)->name);
+    uint32_t keys = 0;
+    if (library.over || library_revealed())
+        return 0;
+    if (library.given >= 0)
+        keys |= panel_bit(library.given);
+    if (library_prompt() == PROMPT_KEYS && (kind == ITEM_SCALE || kind == ITEM_CHORD))
+        keys |= panel_bit(library.target[(library.count - library.inversion) % library.count].midi);
+    if (library.collect && may_collect()) {
+        for (int k = 0; k < NKEYS; ++k)
+            if (library.collected & pitch_bit(base_key() + k))
+                keys |= 1u << k;
     }
+    return keys;
 }
 
-static uint32_t library_panel_notes(void)
+static uint32_t library_wrong_keys(void)
 {
-    uint32_t mask = 0;
-    for (int i = 0; i < library.count; ++i) {
-        int key = library.target[i].midi - FIRST_KEY;
-        if ((unsigned)key < NKEYS)
-            mask |= 1u << key;
+    int mode = play_mode();
+    uint32_t keys = 0, want = step_pitches(library.step);
+    if (library.over || library.result != WRONG || library_answer() != ANSWER_PLAY)
+        return 0;
+    if (mode == PLAY_ANY_OCTAVE || mode == PLAY_EXACT)
+        return library.wrong_note >= 0 && key_contains(&study.held, library.wrong_note) ? panel_bit(library.wrong_note) : 0;
+    for (int k = 0; k < NKEYS; ++k) {
+        int note = base_key() + k;
+        if (!key_contains(&study.held, note))
+            continue;
+        if (mode == PLAY_PITCH_SET ? !(want & pitch_bit(note)) : !(library_all_keys() & (1u << k)))
+            keys |= 1u << k;
     }
-    return mask;
+    return keys;
 }
 
 static uint32_t library_sound_lights(void)
 {
-    uint32_t keys = 0;
-    if (library.group != LIB_EAR || library_revealed()) {
-        for (int i = 0; i < NKEYS; ++i)
-            if (key_contains(&study.demo_notes, FIRST_KEY + i))
-                keys |= 1u << i;
+    return library_prompt() == PROMPT_SOUND && !library_revealed() ? 0 : demo_lights();
+}
+
+static void library_item_title(int item, char *out)
+{
+    int kind = library_kind();
+    char *p = out;
+    if (kind == ITEM_NOTE && written_notes()) {
+        int lo, hi, signs = library_prompt() == PROMPT_STAFF && content_signatures();
+        note_range(&lo, &hi);
+        note_text(out, written_note(lo + item / 3, signs ? 0 : item % 3 - 1), 1);
+    } else if (kind == ITEM_NOTE) {
+        append_text(out, root_name[item]);
+    } else if (kind == ITEM_SIGNATURE) {
+        append_text(append_text(out, key_name(item)), key_minor(item) ? " min" : " maj");
+    } else if (kind == ITEM_MELODY) {
+        append_text(out, "Melody");
+    } else if (kind == ITEM_DEGREE || kind == ITEM_ROMAN) {
+        int minor = key_minor(item / 7);
+        if (kind == ITEM_DEGREE) {
+            p = append_number(out, item % 7 + 1);
+        } else {
+            RomanLabel label = roman_label(key_fifths(item / 7), minor, item % 7, 0, minor && item % 7 == 4 ? 2 : 0, 0);
+            p = roman_text(out, &label);
+        }
+        append_text(append_text(append_text(p, " in "), key_name(item / 7)), minor ? "m" : "");
+    } else if (kind == ITEM_PROGRESSION) {
+        p = append_text(out, key_name(item / PROGRESSION_COUNT));
+        append_text(append_text(p, key_minor(item / PROGRESSION_COUNT) ? "m" : ""), " changes");
+    } else {
+        const Shape *shape = library_shape(kind, item / 12);
+        p = append_text(out, root_label(item % 12, shape));
+        if (kind == ITEM_INTERVAL)
+            p = append_text(p, "+");
+        append_text(p, tritone_or(shape));
     }
-    return keys;
 }
 
 static void library_title_bar(const char *left, const char *right)
@@ -109,338 +238,452 @@ static void library_title_bar(const char *left, const char *right)
     text_right(222, 13, &FONT_T, right, STUDY_MUTED);
 }
 
-static const char *library_menu_item(int index)
-{
-    if (library.group == LIB_CALC) {
-        static const char *const items[] = {"Accidental", "Interval", "Scale", "Chord", "Roman Analysis", "12-Tone Matrix"};
-        return items[index];
-    }
-    if (library.group == LIB_EAR) {
-        static const char *const items[] = {"Play the Note", "Name the Note", "Interval", "Scale", "Chord"};
-        return items[index];
-    }
-    if (library.group == LIB_KEYS) {
-        static const char *const items[] = {"Note", "Reverse Note", "Interval", "Scale", "Chord"};
-        return items[index];
-    }
-    static const char *const items[] = {"Note", "Key Signature", "Interval", "Scale", "Chord"};
-    return items[index];
-}
-
+/* Eight groups down the left, the chosen group's activities down the right. */
 static void library_menu_rows(int offset, int height)
 {
-    int groups = study.practice ? LIB_CALC : 1;
-    for (int row = 0; row < groups; ++row) {
-        int i = study.practice ? row : LIB_CALC;
-        int y = 41 + 25 * row - offset;
-        if (y < 0 || y + 20 > height)
+    const LibraryGroupInfo *group = &library_groups[library.menu_group];
+    for (int i = 0; i < LIB_GROUPS; ++i) {
+        int y = 34 + 19 * i - offset, active = library.menu_group == i;
+        if (y < 0 || y + 17 > height)
             continue;
-        int active = library.group == i;
-        cv_rect(11, y, 81, 20, active ? STUDY_MINT : STUDY_CARD);
-        cv_text(16, y + 2, &FONT_XS, library_groups[i].short_name, active ? STUDY_BG : STUDY_MUTED);
+        cv_rect(11, y, 86, 17, active ? STUDY_MINT : STUDY_CARD);
+        cv_text(16, y + 1, &FONT_XS, library_groups[i].short_name, active ? STUDY_BG : STUDY_MUTED);
     }
-    for (int i = 0; i < library_groups[library.group].count; ++i) {
-        int y = 41 + 25 * i - offset;
-        if (y < 0 || y + 20 > height)
+    for (int i = 0; i < group->count; ++i) {
+        int y = 34 + 19 * i - offset, active = library.menu_item == i;
+        int running = library.menu_group == library.group && library.item == i;
+        if (y < 0 || y + 17 > height)
             continue;
-        int active = library.item == i;
-        cv_rect(101, y, 128, 20, STUDY_CARD);
+        cv_rect(103, y, 126, 17, STUDY_CARD);
         if (active)
-            cv_rect(101, y, 2, 20, STUDY_MINT);
-        cv_text(109, y + 2, &FONT_XS, library_menu_item(i), active ? STUDY_INK : STUDY_MUTED);
+            cv_rect(103, y, 2, 17, STUDY_MINT);
+        cv_text(111, y + 1, &FONT_XS, kind_names[group->kinds[i]], active ? STUDY_INK : STUDY_MUTED);
+        if (running)
+            text_right(224, y + 3, &FONT_T, "Open", STUDY_MINT);
     }
 }
 
 static void library_draw_menu(void)
 {
-    cv_begin(240, 91, STUDY_BG);
-    library_title_bar(study.practice ? "Practice Library" : "Learn Tools", "KEYSTUDY");
-    library_menu_rows(0, 91);
+    const LibraryGroupInfo *group = &library_groups[library.menu_group];
+    int level = kind_level(group->kinds[library.menu_item]);
+    char line[48], *p;
+    cv_begin(240, 110, STUDY_BG);
+    library_title_bar("Practice Library", "KeyStudy");
+    library_menu_rows(0, 110);
     cv_blit(0, 0);
 
-    cv_begin(240, 149, STUDY_BG);
-    library_menu_rows(91, 149);
-    cv_rect(11, 111, 218, 1, STUDY_LINE);
-    control_label(11, 115, study.practice ? "SELECT" : "HOME", study.practice ? "Group" : "Learn");
-    control_label(118, 115, "PRESET", "Activity");
-    control_label(11, 127, "EDIT", "Open");
-    control_label(118, 127, "GLO", "Close");
-    control_label(11, 137, "ENV", "Settings");
-    cv_blit(0, 91);
-}
-
-static const char *library_feedback(void)
-{
-    if (library.result == CORRECT)
-        return "Correct";
-    if (library.result == SKIPPED)
-        return "Skipped";
-    if (library.result == WRONG)
-        return "Try again";
-    if (library.show_answer)
-        return "Answer";
-    if (library.group == LIB_CALC)
-        return "Result";
-    return "Ready";
-}
-
-static void library_context(char out[48])
-{
-    int kind = library_kind();
-    if (kind == ITEM_ROMAN || kind == ITEM_ACCIDENTAL || kind == ITEM_INTERVAL || kind == ITEM_CHORD) {
-        library_key_text(out, library.fifths);
-        if (kind == ITEM_ROMAN) {
-            const char *type = library.quality == 0 ? "Diatonic triad" : (library.quality == 1 ?
-                               "Diatonic seventh" : chord_shape(library.quality - 2)->name);
-            char *end = out;
-            while (*end)
-                ++end;
-            append_text(append_text(end, "  /  "), type);
-        }
-    } else if (kind == ITEM_SCALE) {
-        append_text(out, library_shape(kind, library.quality)->name);
+    cv_begin(240, 130, STUDY_BG);
+    library_menu_rows(110, 130);
+    cv_text(12, 78, &FONT_XS, group->about, STUDY_INK);
+    p = append_text(line, level_names[level]);
+    if (prefs.guided) {
+        p = append_number(append_text(p, " level "), progress.level[level]);
+        append_number(append_text(p, " of "), level_top[level]);
     } else {
-        out[0] = 0;
+        append_text(p, ": custom");
+    }
+    cv_caps(12, 93, &FONT_T, line, STUDY_MUTED);
+    cv_rect(11, 106, 218, 1, STUDY_LINE);
+    control_label(11, 108, "SELECT", "Group");
+    control_label(118, 108, "PRESET", "Activity");
+    control_label(11, 118, "EDIT", "Open");
+    control_label(118, 118, "GLO", "Back");
+    cv_blit(0, 110);
+}
+
+static void library_counter(char out[12])
+{
+    uint32_t limit = library_time_limit();
+    if (limit) {
+        uint32_t left = (limit - (library.clock_ms < limit ? library.clock_ms : limit) + 999u) / 1000u;
+        char *p = append_text(append_number(out, (int)(left / 60u)), left % 60u < 10u ? ":0" : ":");
+        append_number(p, (int)(left % 60u));
+    } else {
+        char *p = append_text(append_number(out, library.seen + library_quiz_open()), "/");
+        append_number(p, library_round_length());
     }
 }
+
 
 static void library_task_top(void)
 {
-    int kind = library_kind();
-    char title[48], detail[48], number[8];
+    int kind = library_kind(), revealed = library_revealed(), named = library_prompt() == PROMPT_NAME;
+    char heading[32], title[56] = "", counter[12];
+    const char *detail = library_instruction();
+    uint16_t detail_color = STUDY_MUTED, accent = STUDY_MINT;
+    drawn_playing = 0;
 
-    cv_begin(240, TOP_HEIGHT, STUDY_BG);
-    library_title_bar(library_groups[library.group].name, "GLO BACK");
-    cv_text(12, 34, &FONT_XS, library_item_name(), STUDY_MUTED);
-    if (library.group != LIB_CALC && !library_finished()) {
-        int n = library.seen + (library_quiz_open() != 0);
-        append_total(number, n);
-        text_right(227, 35, &FONT_T, number, STUDY_MUTED);
+    append_text(heading, kind_names[kind]);
+    if (library_group() == &library_groups[LIB_INKEY] && !library.over)
+        key_text(heading, library.fifths, library.minor);
+    if (library.over) {
+        append_text(title, library.review ? "Review complete" : (library_time_limit() ? "Time is up" : "Round complete"));
+        detail = "First try, without hints";
+    } else if (library.result == CORRECT) {
+        detail = "Correct";
+        detail_color = STUDY_MINT;
+    } else if (library.result == SKIPPED) {
+        detail = "Skipped";
+        detail_color = STUDY_GOLD;
+    } else if (library.result == MISSED) {
+        detail = "Missed: this is the answer";
+        detail_color = accent = STUDY_GOLD;
+    } else if (library.result == WRONG) {
+        detail = library.remark ? library.remark : "Try again";
+        detail_color = accent = STUDY_RED;
+    } else if (library.show_answer) {
+        detail = "Hint";
+        detail_color = STUDY_GOLD;
     }
 
-    if (library_finished()) {
-        append_text(title, "Round complete");
-        append_text(detail, "Results for this activity");
-    } else if (library.group == LIB_CALC || library_revealed() || library.group == LIB_WRITE) {
-        library_target_title(title);
-        if (library.group == LIB_CALC)
-            library_context(detail);
-        else if (library.group == LIB_WRITE && !library_revealed() && library.result != WRONG)
-            append_text(detail, kind == ITEM_SIGNATURE ? "Set the accidentals on the staff" : "Write the notes on the staff");
+    draw_header(heading, library_group()->name, accent);
+    if (!library.over) {
+        library_counter(counter);
+        text_right(221, 53, &FONT_T, counter, STUDY_MUTED);
+        if (named || revealed)
+            library_target_title(title);
         else
-            append_text(detail, library_feedback());
-    } else {
-        const char *prompt = library.group == LIB_EAR ? "Listen and identify" : "Identify the notes";
-        if (kind == ITEM_SIGNATURE)
-            prompt = library.minor ? "Find the minor key" : "Find the major key";
-        else if (library_is_direct())
-            prompt = library.group == LIB_EAR ? "Listen, then play" : "Play the written note";
-        else if (kind == ITEM_NOTE)
-            prompt = library.group == LIB_EAR ? "Name the sound" : "Name the note";
-        else if (kind == ITEM_CHORD)
-            prompt = library.group == LIB_EAR ? "Name the chord type" : "Name the chord";
-        else if (kind == ITEM_SCALE)
-            prompt = "Name the scale";
-        else if (kind == ITEM_INTERVAL)
-            prompt = "Name the interval";
-        append_text(title, prompt);
-        append_text(detail, library.result == WRONG ? "Try again" : (library.group == LIB_EAR ?
-                    (library.demo_count ? "Playing..." : "PLAY to hear the prompt") : ""));
+            append_text(title, library_prompt_title());
     }
-    const felucca_font_t *face = text_w(&FONT_M, title) <= 216 ? &FONT_M : &FONT_B;
-    cv_text(12, face == &FONT_M ? 49 : 55, face, title, STUDY_INK);
-    cv_text(12, 72, &FONT_T, detail, library.result == CORRECT ? STUDY_MINT : STUDY_MUTED);
+    if (!library.over && kind == ITEM_ROMAN) {
+        RomanLabel label = roman_label(library.fifths, library.minor, library.degree, 0, library.type, 0);
+        draw_roman(21, 48, &label, STUDY_INK);
+        cv_text(21, 71, &FONT_XS, detail, detail_color);
+    } else if (!library.over && kind == ITEM_PROGRESSION) {
+        for (int step = 0, x = 21; step < library.steps; ++step) {
+            RomanLabel label = progression_label(step);
+            int ahead = step > library.step && !library_concluded();
+            x = draw_roman(x, 48, &label, step == library.step && !library_concluded() ? STUDY_MINT :
+                           (ahead ? STUDY_MUTED : STUDY_INK)) + 12;
+        }
+        cv_text(21, 71, &FONT_XS, detail, detail_color);
+    } else {
+        draw_card_text(title, detail, detail_color, library.over ? 202 : 166);
+    }
+    drawn_playing = detail == playing_text;
     cv_blit(0, 0);
 }
 
-static void library_matrix_top(void)
+static void draw_cell(int x, int y, int w, int h, const char *label, int selected, int tried)
 {
-    cv_begin(240, TOP_HEIGHT, STUDY_BG);
-    library_title_bar("12-Tone Matrix", "GLO BACK");
-    if (library.row_count == 12) {
-        cv_text(12, 38, &FONT_XS, "P / I / R / RI", STUDY_INK);
-        cv_text(12, 58, &FONT_T, "C = 0   T = 10   E = 11", STUDY_MUTED);
-        control_label(142, 39, "PLAY", "Hear row");
-        control_label(142, 52, "REC", "Undo");
-        control_label(142, 65, "FX", "Clear");
-    } else {
-        cv_text(12, 36, &FONT_B, "Enter a tone row", STUDY_INK);
-        cv_text(12, 57, &FONT_T, "Play each pitch class once", STUDY_MUTED);
-    }
-    cv_blit(0, 0);
+    const felucca_font_t *font = h >= 17 ? &FONT_XS : &FONT_T;
+    cv_rect(x, y, w - 1, h - 1, selected ? STUDY_MINT : STUDY_CARD);
+    cv_text(x + (w - 1 - text_w(font, label)) / 2, y + (h - 1 - font->h) / 2, font, label,
+            selected ? STUDY_BG : (tried ? STUDY_RED : STUDY_INK));
 }
 
-static void library_matrix_bottom(void)
+/* Every answer on offer at once, the chosen one lit: no turning through a hidden list. */
+static void draw_choices(int y, int height)
 {
-    static const char *const pitch[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "T", "E"};
-    cv_begin(240, LOWER_HEIGHT, STUDY_BG);
-    if (library.row_count == 12) {
-        for (int y = 0; y < 12; ++y) {
-            int first = row_matrix_pitch(library.row, y, 0);
-            char label[5];
-            append_text(append_text(label, "P"), pitch[first]);
-            cv_text(10, 13 + y * 10, &FONT_T, label, STUDY_MINT);
-            append_text(append_text(label, "R"), pitch[first]);
-            cv_text(212, 13 + y * 10, &FONT_T, label, STUDY_MUTED);
-            for (int x = 0; x < 12; ++x) {
-                int item = row_matrix_pitch(library.row, y, x);
-                cv_rect(28 + x * 15, 13 + y * 10, 14, 10, x == y ? STUDY_LINE : STUDY_CARD);
-                cv_text(33 + x * 15, 12 + y * 10, &FONT_T, pitch[item], STUDY_INK);
+    int kind = library_kind(), count = 0, columns, rows, row_height;
+    int values[16];
+    char labels[16][12];
+    int roots = kind == ITEM_CHORD && library_prompt() != PROMPT_SOUND;
+
+    if (kind == ITEM_NOTE) {
+        int chromatic = content_roots(LV_NOTES) == 0xFFFu || library.fifths;
+        rows = chromatic ? 3 : 1;
+        row_height = height / rows < 22 ? height / rows : 22;
+        for (int row = 0; row < rows; ++row) {
+            for (int letter = 0; letter < 7; ++letter) {
+                int accidental = chromatic ? 1 - row : 0;
+                spell_text(labels[0], letter, accidental);
+                draw_cell(11 + 31 * letter, y + row * row_height, 31, row_height, labels[0],
+                          library.choice == letter && library.choice_accidental == accidental, 0);
             }
         }
-        for (int x = 0; x < 12; ++x) {
-            int top = row_matrix_pitch(library.row, 0, x);
-            char label[6];
-            append_text(append_text(label, "I"), pitch[top]);
-            cv_text(29 + x * 15, 0, &FONT_T, label, STUDY_MINT);
-            append_text(append_text(label, "RI"), pitch[top]);
-            cv_text(28 + x * 15, 135, &FONT_T, label, STUDY_MUTED);
-        }
-    } else {
-        for (int i = 0; i < 12; ++i) {
-            int x = 12 + (i % 6) * 36, y = 8 + (i / 6) * 28;
-            cv_rect(x, y, 31, 24, STUDY_CARD);
-            cv_text(x + 5, y + 3, &FONT_XS, i < library.row_count ? root_name[library.row[i]] : ".", STUDY_MINT);
-        }
-        draw_keyboard(75, 40, 0, library_sound_lights(), 0);
-        control_label(11, 128, "REC", "Undo");
-        control_label(84, 128, "PLAY", "Hear row");
-        control_label(174, 128, "FX", "Clear");
+        return;
     }
-    cv_blit(0, TOP_HEIGHT);
+    if (kind == ITEM_SIGNATURE) {
+        for (int key = 0; key < 15; ++key) {
+            if (content_key(key + (library.minor ? 15 : 0))) {
+                values[count] = key - 7;
+                append_text(labels[count++], key_name(key + (library.minor ? 15 : 0)));
+            }
+        }
+        columns = 5;
+    } else {
+        uint32_t filter = library_filter(kind);
+        for (int quality = 0; quality < library_quality_count(kind); ++quality) {
+            if (!((filter >> quality) & 1u))
+                continue;
+            const Shape *shape = library_shape(kind, quality);
+            const char *label = kind == ITEM_SCALE ? shape->symbol + 1 : tritone_or(shape);
+            values[count] = quality;
+            append_text(labels[count++], *label ? label : "maj");
+        }
+        columns = kind == ITEM_INTERVAL ? 5 : (kind == ITEM_SCALE ? 4 : 6);
+    }
+    if (!count)
+        return;
+    if (count < columns)
+        columns = count;
+    rows = (count + columns - 1) / columns + roots;
+    row_height = height / rows < 22 ? height / rows : 22;
+    for (int i = 0; i < count; ++i) {
+        int width = 218 / columns;
+        draw_cell(11 + width * (i % columns), y + row_height * (i / columns), width, row_height, labels[i],
+                  values[i] == library.choice, kind != ITEM_SIGNATURE && ((library.tried >> values[i]) & 1u));
+    }
+    if (roots) {
+        uint32_t pool = content_roots(LV_CHORDS);
+        int total = mask_count(pool), width = 218 / total, shown = 0;
+        for (int root = 0; root < 12; ++root) {
+            if ((pool >> root) & 1u)
+                draw_cell(11 + width * shown++, y + row_height * (rows - 1), width, row_height,
+                          root_label(root, chord_shape(library.choice)), root == library.choice_root, 0);
+        }
+    }
 }
 
-static void library_note_names(char out[48])
+static void library_progress_line(char out[48])
+{
+    int mode = play_mode();
+    char *p = out;
+    if (library_kind() == ITEM_PROGRESSION) {
+        p = append_number(append_text(p, "Chord "), library.step + 1);
+        p = append_text(append_number(append_text(p, " / "), library.steps), "    ");
+    }
+    if (mode == PLAY_ANY_OCTAVE || mode == PLAY_EXACT) {
+        p = append_number(append_text(p, "Played  "), library.position);
+        append_number(append_text(p, " / "), library.count);
+    } else if (mode == PLAY_EXACT_SET) {
+        p = append_number(append_text(p, "Held  "), note_total(&study.held));
+        append_number(append_text(p, " / "), library.count);
+    } else {
+        uint32_t entry = library.collect ? library.collected : study.held_pitches;
+        p = append_number(append_text(p, library.collect ? "Tapped  " : "Held  "), pitch_total(entry));
+        append_number(append_text(p, " / "), pitch_total(step_pitches(library.step)));
+    }
+}
+
+/* The chord symbol of one chord in root position, from the notes of a progression. */
+static const char *chord_symbol(const StaffNote *notes, int column)
+{
+    int size = 1;
+    while (notes + size < library.target + library.count && library.column[notes + size - library.target] == column)
+        ++size;
+    for (int quality = 0; quality < chord_quality_count(); ++quality) {
+        const Shape *shape = chord_shape(quality);
+        int same = shape->count == size;
+        for (int i = 1; same && i < size; ++i)
+            same = notes[i].midi - notes[0].midi == shape->semitones[i];
+        if (same)
+            return shape->symbol;
+    }
+    return "";
+}
+
+static void library_answer_names(char out[56])
 {
     char *p = out;
-    for (int i = 0; i < library.count; ++i) {
-        if (i)
-            p = append_text(p, " ");
-        p = library_pitch_text(p, library.target[i], 0);
+    if (library_kind() == ITEM_SIGNATURE) {
+        int signs = library.fifths < 0 ? -library.fifths : library.fifths;
+        append_text(append_number(out, signs), library.fifths < 0 ? " flats" : (signs ? " sharps" : " sharps or flats"));
+        return;
     }
-    *p = 0;
+    if (library_kind() == ITEM_PROGRESSION) {      /* four chords of notes will not fit: their names do */
+        for (int i = 0; i < library.count; ++i) {
+            if (i && library.column[i] == library.column[i - 1])
+                continue;
+            p = note_text(i ? append_text(p, "   ") : p, library.target[i], 0);
+            p = append_text(p, chord_symbol(&library.target[i], library.column[i]));
+        }
+        return;
+    }
+    for (int i = 0; i < library.count; ++i)
+        p = note_text(i ? append_text(p, " ") : p, library.target[i], 0);
+}
+
+static void library_summary(void)
+{
+    char line[72], *p;
+    cv_begin(240, LOWER_HEIGHT, STUDY_BG);
+    p = append_number(line, library.first_try);
+    append_text(append_number(append_text(p, " / "), library.seen), " first try");
+    cv_text(12, 0, &FONT_M, line, STUDY_MINT);
+
+    p = append_text(append_number(line, library.solved), " solved");
+    if (library.timed_answers) {
+        uint32_t tenths = library.time_total / (100u * (uint32_t)library.timed_answers);
+        p = append_number(append_text(p, "    average "), (int)(tenths / 10u));
+        append_text(append_number(append_text(p, "."), (int)(tenths % 10u)), " s");
+    }
+    cv_text(12, 27, &FONT_XS, line, STUDY_INK);
+    if (library_time_limit()) {
+        p = append_number(line, (library.first_try + prefs.timer / 2) / prefs.timer);
+        p = append_text(p, " a minute");
+        if (library.new_best)
+            append_text(p, "    New best");
+        else
+            append_number(append_text(p, "    best "), progress.best[library_activity()]);
+        cv_text(12, 43, &FONT_XS, line, library.new_best ? STUDY_GOLD : STUDY_MUTED);
+    }
+
+    if (library.missed_count) {
+        int y = 61, x = 12;
+        cv_caps(12, 61, &FONT_T, "Go over", STUDY_MUTED);
+        x = 60;
+        for (int i = 0; i < library.missed_count && y < 100; ++i) {
+            library_item_title(library.missed[i], line);
+            if (x + text_w(&FONT_XS, line) > 228) {
+                x = 12;
+                y += 15;
+            }
+            if (y < 100)
+                x = cv_text(x, y - 2, &FONT_XS, line, STUDY_INK) + 9;
+        }
+    } else if (library.seen) {
+        cv_text(12, 61, &FONT_XS, "Nothing missed.", STUDY_MUTED);
+    }
+    if (library.level_offer) {
+        int level = kind_level(library_kind());
+        p = append_number(append_text(append_text(line, level_names[level]), " level "), progress.level[level] + 1);
+        append_text(append_text(p, ": "), level_text[level][progress.level[level]]);
+        cv_text(12, 102, &FONT_XS, line, STUDY_GOLD);
+    }
+    cv_rect(11, 118, 218, 1, STUDY_LINE);
+    control_label(11, 120, "EDIT", "New round");
+    if (library.missed_count)
+        control_label(118, 120, "SEL", "Retry missed");
+    if (library.level_offer)
+        control_label(11, 131, "SAVE", "Level up");
+    control_label(118, 131, "GLO", "Library");
+    control_label(11, 141, "ENV", "Settings");
+    draw_notice();
+    cv_blit(0, TOP_HEIGHT);
 }
 
 static void library_task_bottom(void)
 {
-    int kind = library_kind();
-    int calculator = library.group == LIB_CALC;
-    int shown = library_revealed() || calculator;
-    int write = library.group == LIB_WRITE && !shown;
-    int staff = shown || library.group == LIB_STAFF || library.group == LIB_WRITE || kind == ITEM_REVERSE;
-    uint32_t guides = 0, root = 0;
-    char line[48] = "";
+    int kind = library_kind(), answer = library_answer(), prompt = library_prompt();
+    int shown = library_revealed(), open = library_quiz_open();
+    int write = answer == ANSWER_WRITE && !shown;
+    int staff = shown || prompt == PROMPT_STAFF || answer == ANSWER_WRITE;
+    int grid = answer == ANSWER_CHOICE && !shown;
+    uint32_t guides = library_guide_keys(), anchors = library_anchor_keys(), wrong = library_wrong_keys();
+    char line[56] = "";
+
     cv_begin(240, LOWER_HEIGHT, STUDY_BG);
-
-    if (library_finished()) {
-        char *p = append_text(append_total(line, library.first_try), " first try     ");
-        append_text(append_total(p, library.solved), " solved");
-        cv_text(12, 15, &FONT_M, line, STUDY_INK);
-        control_label(12, 115, "EDIT", "New round");
-        control_label(150, 115, "GLO", "Library");
-        cv_blit(0, TOP_HEIGHT);
-        return;
-    }
-
     if (staff) {
-        int fifths = kind == ITEM_SIGNATURE ? (write ? library.choice : library.fifths) :
-                     (calculator && kind != ITEM_SCALE ? library.fifths : 0);
-        draw_notation(write ? library.written : library.target, library.count,
-                      write ? library.filled : (1 << library.count) - 1,
-                      kind == ITEM_CHORD || kind == ITEM_ROMAN, fifths,
-                      write && kind != ITEM_SIGNATURE ? library.cursor : -1, shown);
-    }
-    if (shown || (library.group == LIB_KEYS && kind != ITEM_REVERSE)) {
-        guides = library_panel_notes();
-        if (!shown && (kind == ITEM_SCALE || kind == ITEM_CHORD)) {
-            int key = library.target[0].midi - FIRST_KEY;
-            if ((unsigned)key < NKEYS)
-                root = 1u << key;
+        uint32_t all = library.count >= 32 ? ~0u : (1u << library.count) - 1u, done = 0;
+        if (answer == ANSWER_PLAY && !shown && play_mode() == PLAY_EXACT) {
+            for (int i = 0; i < library.position; ++i)
+                done |= 1u << (heard_descending() ? library.count - 1 - i : i);
         }
+        int stacked = heard_together() || (kind == ITEM_CHORD && answer != ANSWER_PLAY) ||
+                      (kind == ITEM_INTERVAL && prompt == PROMPT_SOUND && prefs.order == HEAR_TOGETHER);
+        draw_notation(&(Score){
+            .notes = write ? library.written : library.target,
+            .column = library.column,
+            .count = library.count,
+            .columns = library.steps,
+            .stacked = stacked,
+            .filled = write ? (uint32_t)library.filled : all,
+            .done = done,
+            .wrong = write ? library.wrong_slots : 0,
+            .fifths = kind == ITEM_SIGNATURE && write ? library.choice : library.fifths,
+            .cursor = write && kind != ITEM_SIGNATURE ? library.cursor : -1,
+            .live = shown,
+        });
     }
+
     if (shown) {
-        if (kind == ITEM_ACCIDENTAL) {
-            int sign = written_accidental(library.target[0], library.fifths);
-            static const char *const names[] = {"Triple flat", "Double flat", "Flat", "No sign needed",
-                                                "Sharp", "Double sharp", "Triple sharp", "Natural sign"};
-            append_text(line, names[sign == ACCIDENTAL_NATURAL ? 7 : clamp(sign, -3, 3) + 3]);
-        } else {
-            library_note_names(line);
-        }
-    } else if (write && kind != ITEM_SIGNATURE) {
+        library_answer_names(line);
+    } else if (write && kind == ITEM_SIGNATURE) {
+        int signs = library.choice < 0 ? -library.choice : library.choice;
+        append_text(append_number(line, signs), library.choice < 0 ? " flats" : (signs ? " sharps" : " sharps or flats"));
+    } else if (write) {
         char *p = append_text(append_number(append_text(line, "Note "), library.cursor + 1), " / ");
         append_number(p, library.count);
-    } else if (write) {
-        int fifths = library.choice;
-        char *p = append_number(line, fifths < 0 ? -fifths : fifths);
-        append_text(p, fifths < 0 ? " flats" : (fifths > 0 ? " sharps" : " accidentals"));
-    } else if (!library_is_direct()) {
-        char answer[35];
-        library_choice_text(answer);
-        append_text(append_text(line, "Answer   "), answer);
-    } else {
-        append_text(line, library.demo_count ? "Playing..." : "Answer on the keys");
+    } else if (answer == ANSWER_PLAY) {
+        library_progress_line(line);
     }
 
-    if (staff)
-        draw_score_readout(line);
-    else
-        cv_text(12, 17, &FONT_M, line, STUDY_MINT);
-    int keys_y = staff ? SCORE_KEYS_Y : 52;
-    draw_keyboard(keys_y, 117 - keys_y, guides, library_sound_lights(), root);
-    cv_rect(11, 118, 218, 1, STUDY_LINE);
-    if (calculator) {
-        if (kind == ITEM_ACCIDENTAL) {
-            control_label(11, 120, "SELECT", "Note");
-            control_label(91, 120, "ALGO", "Key");
-            control_label(162, 120, "PRESET", "Accid.");
-        } else if (kind == ITEM_ROMAN) {
-            control_label(11, 120, "SELECT", "Key");
-            control_label(91, 120, "ALGO", "Degree");
-            control_label(162, 120, "PRESET", "Type");
-            control_label(11, 131, "K1", "Inversion");
-            control_label(91, 131, "K2", "Alter");
-            control_label(162, 131, "REC", "Maj/min");
-        } else {
-            if (kind != ITEM_SCALE)
-                control_label(11, 120, "SELECT", "Key");
-            control_label(91, 120, "ALGO", "Type");
-            control_label(162, 120, "PRESET", "Root");
-        }
-        control_label(11, 140, "PLAY", "Hear");
+    if (grid && prompt == PROMPT_STAFF) {
+        draw_choices(80, 38);
+    } else if (grid && prompt == PROMPT_KEYS) {
+        draw_keyboard(2, 40, guides, library_sound_lights(), anchors, wrong);
+        draw_choices(48, 70);
+    } else if (grid) {
+        draw_choices(6, 110);
+    } else if (staff) {
+        draw_score_readout(line, STUDY_MINT);
+        draw_keyboard(SCORE_KEYS_Y, 117 - SCORE_KEYS_Y, guides, library_sound_lights(), anchors, wrong);
     } else {
-        int open = library_quiz_open();
-        if (open && library.group == LIB_WRITE && kind != ITEM_SIGNATURE) {
-            control_label(11, 120, "SELECT", "Slot");
-            control_label(91, 120, "ALGO", "Line");
-            control_label(162, 120, "PRESET", "Accid.");
-            control_label(91, 130, "REC", "Erase");
-            control_label(162, 130, "SEL", "Set");
-        } else if (open && !library_is_direct()) {
-            control_label(11, 120, "PRESET", write ? "Accidentals" : "Answer");
-            if (kind == ITEM_CHORD && library.group != LIB_EAR)
-                control_label(115, 120, "ALGO", "Root");
-        }
-        if (kind != ITEM_SIGNATURE && (shown || library.group == LIB_EAR))
-            control_label(11, 130, "PLAY", "Hear");
-        if (open) {
-            control_label(11, 140, "FX", shown ? "Hide" : "Hint");
-            control_label(91, 140, "SAVE", "Skip");
-        }
-        if (!open || !library_is_direct())
-            control_label(162, 140, "EDIT", open ? "Check" : "Next");
+        cv_rect(11, 0, 218, 24, STUDY_CARD);
+        cv_text(21, 5, &FONT_XS, line, STUDY_MUTED);
+        draw_keyboard(52, 65, guides, library_sound_lights(), anchors, wrong);
     }
+
+    cv_rect(11, 118, 218, 1, STUDY_LINE);
+    if (open && write && kind != ITEM_SIGNATURE) {
+        control_label(11, 120, "SELECT", "Slot");
+        control_label(91, 120, "ALGO", "Line");
+        control_label(162, 120, "PRESET", "Sign");
+        control_label(11, 130, "SEL", "Set");
+        control_label(91, 130, "REC", "Erase");
+    } else if (open && answer == ANSWER_PLAY) {
+        control_label(11, 120, "SELECT", "Activity");
+        if (may_collect())
+            control_label(91, 120, "ARP", library.collect ? "Tap" : "Hold");
+        control_label(162, 120, "REC", holds_keys() ? "Clear" : "Restart");
+        control_label(11, 130, "PLAY", "Hear");
+        control_label(91, 130, "OCT", "Octave");
+    } else if (open) {
+        control_label(11, 120, "PRESET", kind == ITEM_NOTE ? "Letter" : (write ? "Signs" : "Answer"));
+        if (kind == ITEM_NOTE && (content_roots(LV_NOTES) == 0xFFFu || library.fifths))
+            control_label(91, 120, "ALGO", "Sign");
+        else if (kind == ITEM_CHORD && prompt != PROMPT_SOUND)
+            control_label(91, 120, "ALGO", "Root");
+        if (answer != ANSWER_WRITE)
+            control_label(162, 120, "SELECT", "Activity");
+        if (kind != ITEM_SIGNATURE)
+            control_label(11, 130, "PLAY", "Hear");
+    } else if (kind != ITEM_SIGNATURE) {
+        control_label(11, 130, "PLAY", "Hear");
+    }
+    if (open) {
+        control_label(162, 130, "FX", library.show_answer ? "Hide" : "Hint");
+        control_label(11, 140, "SAVE", "Skip");
+    }
+    if (!open || answer != ANSWER_PLAY || holds_keys())
+        control_label(91, 140, "EDIT", open ? "Check" : "Next");
+    control_label(162, 140, "GLO", "Library");
+    draw_notice();
     cv_blit(0, TOP_HEIGHT);
+}
+
+static void library_lights(void)
+{
+    uint32_t buttons = 1u << B_SEQ, controls = (1u << B_PLAY) | (1u << B_EDIT);
+    if (library.page == LIB_MENU) {
+        plat_lights(buttons | (1u << B_GLO), study.panel, controls, 0, 2);
+        return;
+    }
+    if (!library.over) {
+        controls |= (1u << B_FX) | (1u << B_SAVE) | (may_collect() ? 1u << B_ARP : 0);
+        if (demo_playing() || library.result == CORRECT)
+            buttons |= LED_PLAY_GREEN;
+        if (library.wrong_at)                /* PLAY turns red while a miss registers */
+            buttons |= 1u << B_PLAY;
+    }
+    plat_lights(buttons, study.panel | library_sound_lights(), controls,
+                library_guide_keys() | library_anchor_keys(), 2);
 }
 
 static void library_frame(uint32_t now)
 {
     if (ann_on() && ann_where()) {
-        char speech[120], title[48];
-        char *p = append_text(speech, library_groups[library.group].name);
-        p = append_text(append_text(p, ". "), library_item_name());
-        if (library.page == LIB_TASK && (library.group == LIB_CALC || library_revealed())) {
-            library_target_title(title);
+        char speech[140], title[56];
+        char *p = append_text(speech, library_group()->name);
+        p = append_text(append_text(p, ". "), kind_names[library_kind()]);
+        if (library.page == LIB_TASK && !library.over) {
+            if (library_prompt() == PROMPT_NAME || library_revealed())
+                library_target_title(title);
+            else
+                append_text(title, library_prompt_title());
             append_text(append_text(p, ". "), title);
         }
         ann_say(speech, 0, ANN_NOW);
@@ -449,23 +692,15 @@ static void library_frame(uint32_t now)
     if (!study.dirty)
         return;
     study.dirty = 0;
-
+    library_lights();
     if (library.page == LIB_MENU) {
-        plat_lights(1u << B_GLO, study.panel, 1u << B_EDIT, 0, 2);
         library_draw_menu();
     } else {
-        int show_notes = library_revealed() || library.group == LIB_CALC ||
-                         (library.group == LIB_KEYS && library_kind() != ITEM_REVERSE);
-        uint32_t keys = show_notes ? library_panel_notes() : 0;
-        uint32_t buttons = (1u << B_GLO) | (library.demo_count ? LED_PLAY_GREEN : 0);
-        plat_lights(buttons, study.panel | library_sound_lights(), (1u << B_PLAY) | (1u << B_EDIT), keys, 2);
-        if (library_kind() == ITEM_MATRIX) {
-            library_matrix_top();
-            library_matrix_bottom();
-        } else {
-            library_task_top();
+        library_task_top();
+        if (library.over)
+            library_summary();
+        else
             library_task_bottom();
-        }
     }
 }
 
@@ -475,24 +710,64 @@ static int library_expect(const char *what, int *got)
     if (!strcmp(what, "lib_page")) *got = library.page;
     else if (!strcmp(what, "lib_group")) *got = library.group;
     else if (!strcmp(what, "lib_item")) *got = library.item;
+    else if (!strcmp(what, "lib_menu_group")) *got = library.menu_group;
+    else if (!strcmp(what, "lib_menu_item")) *got = library.menu_item;
     else if (!strcmp(what, "lib_kind")) *got = library_kind();
+    else if (!strcmp(what, "lib_activity")) *got = library_activity();
     else if (!strcmp(what, "lib_count")) *got = library.count;
+    else if (!strcmp(what, "lib_steps")) *got = library.steps;
+    else if (!strcmp(what, "lib_step")) *got = library.step;
+    else if (!strcmp(what, "lib_position")) *got = library.position;
     else if (!strcmp(what, "lib_result")) *got = library.result;
+    else if (!strcmp(what, "lib_misses")) *got = library.misses;
+    else if (!strcmp(what, "lib_seen")) *got = library.seen;
+    else if (!strcmp(what, "lib_solved")) *got = library.solved;
     else if (!strcmp(what, "lib_first_try")) *got = library.first_try;
+    else if (!strcmp(what, "lib_missed")) *got = library.missed_count;
+    else if (!strcmp(what, "lib_over")) *got = library.over;
+    else if (!strcmp(what, "lib_review")) *got = library.review;
+    else if (!strcmp(what, "lib_offer")) *got = library.level_offer;
     else if (!strcmp(what, "lib_revealed")) *got = library_revealed();
-    else if (!strcmp(what, "lib_demo")) *got = library.demo_count;
-    else if (!strcmp(what, "lib_block_demo")) *got = library.demo_block;
     else if (!strcmp(what, "lib_lights")) *got = (int)library_sound_lights();
+    else if (!strcmp(what, "lib_guides")) *got = (int)library_guide_keys();
+    else if (!strcmp(what, "lib_anchors")) *got = (int)library_anchor_keys();
+    else if (!strcmp(what, "lib_wrong_keys")) *got = (int)library_wrong_keys();
     else if (!strcmp(what, "lib_filled")) *got = library.filled;
+    else if (!strcmp(what, "lib_wrong_slots")) *got = (int)library.wrong_slots;
     else if (!strcmp(what, "lib_fifths")) *got = library.fifths;
+    else if (!strcmp(what, "lib_minor")) *got = library.minor;
     else if (!strcmp(what, "lib_choice")) *got = library.choice;
+    else if (!strcmp(what, "lib_choice_root")) *got = library.choice_root;
     else if (!strcmp(what, "lib_quality")) *got = library.quality;
+    else if (!strcmp(what, "lib_root")) *got = library.root;
+    else if (!strcmp(what, "lib_inversion")) *got = library.inversion;
+    else if (!strcmp(what, "lib_collect")) *got = library.collect;
+    else if (!strcmp(what, "lib_collected")) *got = (int)library.collected;
+    else if (!strcmp(what, "lib_tried")) *got = (int)library.tried;
+    else if (!strcmp(what, "lib_hinted")) *got = library.hinted;
+    else if (!strcmp(what, "lib_again")) *got = library.again_count;
+    else if (!strcmp(what, "lib_says_playing")) *got = drawn_playing;
+    else if (!strcmp(what, "lib_bag")) {
+        *got = 0;
+        for (int i = 0; i < BAG_WORDS; ++i)
+            *got += pitch_total(library.bag[i]);
+    }
+    else if (!strcmp(what, "lib_item_id")) *got = library.item_id;
+    else if (!strcmp(what, "lib_items")) *got = item_total();
+    else if (!strcmp(what, "lib_box")) *got = library.stat < 0 ? -1 : progress.box[library.stat];
+    else if (!strcmp(what, "lib_best")) *got = progress.best[library_activity()];
+    else if (!strcmp(what, "lib_given")) *got = library.given;
     else if (!strcmp(what, "lib_note_letter")) *got = positive_mod(library.target[0].position, 7);
     else if (!strcmp(what, "lib_note_acc")) *got = library.target[0].accidental;
+    else if (!strncmp(what, "lib_note", 8) && what[8] >= '0' && what[8] <= '9') *got = library.target[atoi(what + 8)].midi;
     else if (!strcmp(what, "lib_first_note")) *got = library.target[0].midi;
     else if (!strcmp(what, "lib_last_note")) *got = library.target[library.count - 1].midi;
-    else if (!strcmp(what, "lib_row_count")) *got = library.row_count;
-    else if (!strcmp(what, "lib_matrix_sample")) *got = row_matrix_pitch(library.row, 5, 7);
+    else if (!strcmp(what, "lib_clock")) *got = (int)library.clock_ms;
+    else if (!strcmp(what, "lib_allowed")) {
+        *got = 0;
+        for (int i = 0; i < item_total(); ++i)
+            *got += item_allowed(i);
+    }
     else return 0;
     return 1;
 }
