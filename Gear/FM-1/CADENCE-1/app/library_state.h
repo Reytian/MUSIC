@@ -11,6 +11,12 @@ enum { ANSWER_PLAY, ANSWER_CHOICE, ANSWER_WRITE };
 enum { PLAY_ANY_OCTAVE, PLAY_EXACT, PLAY_PITCH_SET, PLAY_EXACT_SET };
 enum { TARGET_MAX = 16, BAG_WORDS = 8, AGAIN_MAX = 4, AGAIN_GAP = 3,
        ADVANCE_MS = 900, AUTOPLAY_MS = 280, WRONG_FLASH_MS = 600 };
+/* After a reveal, and when something new is shown, the answer stays up until the player has
+ * played it once (or pressed EDIT): waiting for that, then done. */
+enum { COPY_NONE, COPY_WAIT, COPY_DONE };
+/* Saved scores and the resumed activity go by slot. 0.5.0 had 34 activities; one added since
+ * takes a slot after them, so the others keep theirs. */
+enum { SLOT_STAFF_MELODY = 34 };
 
 typedef struct {
     const char *name, *short_name, *about;
@@ -22,7 +28,7 @@ static const LibraryGroupInfo library_groups[LIB_GROUPS] = {
     {"Play from Name", "Play Name", "Read a name, play it on the keys",
      PROMPT_NAME, ANSWER_PLAY, 5, {ITEM_NOTE, ITEM_INTERVAL, ITEM_SCALE, ITEM_CHORD, ITEM_INVERSION}},
     {"Play from Staff", "Play Staff", "Read the staff, play what is written",
-     PROMPT_STAFF, ANSWER_PLAY, 4, {ITEM_NOTE, ITEM_INTERVAL, ITEM_SCALE, ITEM_CHORD}},
+     PROMPT_STAFF, ANSWER_PLAY, 5, {ITEM_NOTE, ITEM_INTERVAL, ITEM_SCALE, ITEM_CHORD, ITEM_MELODY}},
     {"Play by Ear", "Play Ear", "Listen, then play it back",
      PROMPT_SOUND, ANSWER_PLAY, 4, {ITEM_NOTE, ITEM_INTERVAL, ITEM_CHORD, ITEM_MELODY}},
     {"Play in Key", "Play Key", "Find degrees and chords inside a key",
@@ -58,6 +64,9 @@ static struct {
 
     /* The question. */
     int item_id, stat, result, misses, hinted, show_answer, wait_release;
+    int clue;                              /* FX once: the rule, or the question the other way round */
+    int copy, teaching;                    /* COPY_*; teaching: a first meeting, shown before it is asked */
+    int reasked;                           /* this question came back from the again queue */
     const char *remark;
     int root, quality, fifths, minor, inversion, degree, type, flat;
     int count, steps, given;

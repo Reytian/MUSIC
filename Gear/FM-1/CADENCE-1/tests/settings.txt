@@ -66,6 +66,8 @@ expect pref_clef 2
 expect pref_length 5
 
 # Three misses before the answer shows, and no moving on until EDIT.
+teach 0
+activity 0 3
 tap SEQ
 ask 0
 wait 40
@@ -82,7 +84,8 @@ expect lib_misses 2
 key 3 up
 key 4 down
 wait 150
-expect lib_result 4
+expect lib_result 0
+expect lib_copy 1
 key 0 up
 key 1 up
 key 4 up
@@ -227,6 +230,7 @@ reboot
 wait 600
 expect pref_guided 0
 expect pref_intervals 4
+activity 0 3
 tap SEQ
 tap GLO
 spin PRESET -2

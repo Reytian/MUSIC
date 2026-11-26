@@ -468,8 +468,16 @@ void app_init(void)
     study.topic = SEVENTHS;
     study.lesson[SEVENTHS] = (Question){11, 1};
     study.rng = 0x3BE5F4A1u;
-    library.group = LIB_NAME;
-    library.item = 3;                 /* SEQ opens on chords, played from their names */
+    library.group = LIB_KEYS;         /* a first SEQ names lit keys; later ones go back to the last activity */
+    library.item = 0;
+    for (int group = 0; group < LIB_GROUPS; ++group) {
+        for (int item = 0; item < library_groups[group].count; ++item) {
+            if (activity_slot(group, item) + 1 == prefs.spare) {
+                library.group = group;
+                library.item = item;
+            }
+        }
+    }
     library.last_item = -1;
     sound_init();
 }

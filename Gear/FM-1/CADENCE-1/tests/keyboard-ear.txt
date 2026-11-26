@@ -1,5 +1,7 @@
 # Keyboard Identification and Ear Training: answers chosen from the grid.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 tap ENV
 spin SELECT 5

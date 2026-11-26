@@ -1,5 +1,7 @@
 # SEQ opens practice on chords played from their names.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 expect practice 1
 expect lib_page 2
@@ -64,7 +66,8 @@ key 13 up
 key 16 up
 wait 1000
 
-# Two misses turn the question into its answer, heard and shown.
+# Two misses turn the question into its answer, heard and shown with the rule behind it. The
+# keys still listen: the answer stays up until it is played once, or EDIT moves on.
 ask 0
 wait 40
 key 7 down
@@ -78,20 +81,25 @@ key 15 up
 key 10 down
 key 14 down
 wait 140
-expect lib_result 4
+expect lib_copy 1
+expect lib_result 0
 expect lib_misses 2
 expect lib_revealed 1
 expect lib_guides 18560
 expect demo 3
 expect lib_missed 2
+expect lib_seen 3
+title C
+card Major: 1 3 5
 shot missed.png
 key 7 up
 key 10 up
 key 14 up
 wait 1500
-expect lib_result 4
+expect lib_copy 1
 tap EDIT
 expect lib_result 0
+expect lib_copy 0
 expect lib_seen 3
 
 # Tap mode gathers the chord a note at a time; another octave takes a note back out.
@@ -148,14 +156,21 @@ tap SEQ
 expect held_pcs 0
 expect lib_page 2
 
-# A hint shows the answer and takes the question off the first-try count.
+# A hint gives the rule first and the answer on a second press; either takes the question off
+# the first-try count.
 ask 95
 wait 40
 expect lib_first_try 3
 tap FX
-expect lib_revealed 1
+expect lib_clue 1
+expect lib_revealed 0
 expect lib_hinted 1
+expect lib_guides 0
+card Minor seventh: 1 b3 5 b7
+tap FX
+expect lib_revealed 1
 expect lib_guides 74304
+card Minor seventh: 1 b3 5 b7
 key 6 down
 key 9 down
 key 13 down

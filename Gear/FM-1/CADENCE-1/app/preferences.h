@@ -21,7 +21,8 @@ typedef struct {
     uint8_t advance;              /* Move on by itself after a correct answer. */
     uint8_t reveal;               /* Show the answer after two misses (0), three (1), or never (2). */
     uint8_t timer;                /* A round by the clock: minutes, 0 for a round by count. */
-    uint8_t inversions, signatures, ledger, spare;
+    uint8_t inversions, signatures, ledger;
+    uint8_t spare;                /* The activity SEQ comes back to: its slot + 1, 0 for none yet. */
 } StudyPreferences;
 
 static const StudyPreferences default_preferences = {

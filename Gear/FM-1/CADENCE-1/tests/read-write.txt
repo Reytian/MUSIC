@@ -1,5 +1,7 @@
 # Staff Identification and Staff Construction, with the Custom material so every type is in play.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 tap ENV
 spin SELECT 5

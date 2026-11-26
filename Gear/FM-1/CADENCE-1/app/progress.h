@@ -28,6 +28,7 @@ typedef struct {
 
 static Progress progress;
 static int progress_dirty, progress_failed;
+static int resume_dirty;                     /* prefs.spare names a new activity to come back to */
 static uint32_t progress_tried_at;
 
 static struct {
@@ -73,14 +74,25 @@ static void load_progress(void)
     progress_dirty = progress_failed = 0;
 }
 
+/* The activity under way rides in the settings' spare byte, saved with the progress. */
 static void save_progress(uint32_t now)
 {
-    if (!progress_dirty)
+    if (!progress_dirty && !resume_dirty)
         return;
     progress_tried_at = now;
-    progress_failed = plat_store_save(OBJ_PROGRESS, &progress, sizeof progress) != 0;
-    if (!progress_failed)
-        progress_dirty = 0;
+    progress_failed = 0;
+    if (resume_dirty) {
+        if (plat_store_save(OBJ_PREFS, &prefs, sizeof prefs) == 0)
+            resume_dirty = 0;
+        else
+            progress_failed = 1;
+    }
+    if (progress_dirty) {
+        if (plat_store_save(OBJ_PROGRESS, &progress, sizeof progress) == 0)
+            progress_dirty = 0;
+        else
+            progress_failed = 1;
+    }
 }
 
 /* A save stops the sound for a moment, so it waits for a quiet one. Away from an open question
@@ -89,7 +101,7 @@ static void save_progress(uint32_t now)
 static int progress_save_due(uint32_t now, int answering)
 {
     uint32_t since = now - progress_tried_at;
-    if (!progress_dirty)
+    if (!progress_dirty && !resume_dirty)
         return 0;
     if (progress_failed)
         return since >= 10000u;

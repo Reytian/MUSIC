@@ -1,5 +1,7 @@
 # Each level of each kind opens the material the README lists for it.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 expect lib_group 0
 expect lib_item 3

@@ -9,6 +9,7 @@
 #define APP_HOST_EXPECT
 #define APP_HOST_REBOOT
 #define APP_HOST_CMD
+#define APP_HOST_FAILS
 
 /* An object keeps its number from one release to the next: new ones go on the end. */
 enum { OBJ_PANEL, OBJ_PREFS, OBJ_PROGRESS, OBJ_NOBJ };
@@ -24,3 +25,4 @@ void app_say(const char *a, const char *b);
 int app_expect(const char *what, int *got);
 void app_host_reboot(void);
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d);
+int app_host_fails(void);

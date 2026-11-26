@@ -145,7 +145,7 @@ static void draw_key_signature(StaffLayout staff, int fifths)
     static const int8_t treble_sharps[] = {10, 7, 11, 8, 5, 9, 6};
     static const int8_t bass_sharps[] = {-4, -7, -3, -6, -9, -5, -8};
     static const int8_t treble_flats[] = {6, 9, 5, 8, 4, 7, 3};
-    static const int8_t bass_flats[] = {-8, -5, -9, -6, -10, -7, -4};
+    static const int8_t bass_flats[] = {-8, -5, -9, -6, -10, -7, -11};  /* F-flat below, as most music sets it */
     const int8_t *sharps = staff.bass ? bass_sharps : treble_sharps;
     const int8_t *flats = staff.bass ? bass_flats : treble_flats;
     const int8_t *positions = fifths > 0 ? sharps : flats;

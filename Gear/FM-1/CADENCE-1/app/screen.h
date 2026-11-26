@@ -54,11 +54,17 @@ static void draw_header(const char *heading, const char *eyebrow, uint16_t accen
     cv_rect(11, 48, 2, 40, accent);
 }
 
+/* The card's second line: a long rule steps down to the small face rather than run off the card. */
+static void draw_card_detail(const char *detail, uint16_t color)
+{
+    cv_text(21, 71, text_w(&FONT_XS, detail) > 206 ? &FONT_T : &FONT_XS, detail, color);
+}
+
 static void draw_card_text(const char *title, const char *detail, uint16_t detail_color, int room)
 {
     const felucca_font_t *face = text_w(&FONT_M, title) > room ? &FONT_B : &FONT_M;
     cv_text(21, face == &FONT_M ? 48 : 54, face, title, STUDY_INK);
-    cv_text(21, 71, &FONT_XS, detail, detail_color);
+    draw_card_detail(detail, detail_color);
 }
 
 static uint32_t learn_guides(void)
@@ -269,14 +275,55 @@ void app_host_reboot(void)
     memset(&sound_notes, 0, sizeof sound_notes);
 }
 
+static int host_fails;
+
+int app_host_fails(void)
+{
+    return host_fails;
+}
+
+/* card TEXT / title TEXT: the practice card's second or first line, as last drawn, is TEXT. */
+static int host_card_check(const char *cmd, const char *drawn)
+{
+    const char *want = plat_host_line + strlen(cmd);
+    size_t length;
+    while (*want == ' ')
+        ++want;
+    length = strlen(want);
+    while (length && (want[length - 1] == '\n' || want[length - 1] == '\r' || want[length - 1] == ' '))
+        --length;
+    if (strlen(drawn) == length && !strncmp(drawn, want, length)) {
+        printf("  ok %s \"%s\"\n", cmd, drawn);
+    } else {
+        printf("FAIL %s: \"%s\", wanted \"%.*s\"\n", cmd, drawn, (int)length, want);
+        ++host_fails;
+    }
+    return 1;
+}
+
 /* Commands for the test scripts.  seed N: start the generator from N.  ask ITEM [N]: pose that
  * item of the open activity, N standing in for the dice. */
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
 {
     (void)c;
     (void)d;
+    if (!strcmp(cmd, "card"))
+        return host_card_check(cmd, drawn_detail);
+    if (!strcmp(cmd, "title"))
+        return host_card_check(cmd, drawn_title);
     if (!strcmp(cmd, "seed")) {
         study.rng = (uint32_t)strtoul(a, 0, 0);
+        return 1;
+    }
+    if (!strcmp(cmd, "teach")) {             /* teach 0|1: new shapes shown before they are asked */
+        teach_off = !atoi(a);
+        return 1;
+    }
+    if (!strcmp(cmd, "activity")) {          /* activity GROUP ITEM: where SEQ opens (at once if open) */
+        library.group = atoi(a);
+        library.item = atoi(b);
+        if (library.page != LIB_CLOSED)
+            library_start(plat_ms());
         return 1;
     }
     if (!strcmp(cmd, "level")) {             /* level KIND N: that kind of material at level N */

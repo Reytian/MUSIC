@@ -1,6 +1,8 @@
-# A round draws every item once before any comes back. Chord level 1 has fourteen: major and
-# minor on the seven white roots.
+# A round draws every item once before any is drawn again. Chord level 1 has fourteen: major and
+# minor on the seven white roots. Each skipped item also comes back once, three questions on.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 expect lib_kind 4
 expect level_2 1
@@ -12,6 +14,12 @@ tap SAVE
 tap EDIT
 tap SAVE
 tap EDIT
+expect lib_bag 4
+tap SAVE
+tap EDIT
+expect lib_item_id 23
+expect lib_reasked 1
+expect lib_bag 4
 tap SAVE
 tap EDIT
 tap SAVE
@@ -20,26 +28,55 @@ tap SAVE
 tap EDIT
 tap SAVE
 tap EDIT
+expect lib_reasked 0
+expect lib_bag 5
 tap SAVE
 tap EDIT
-tap SAVE
-tap EDIT
-expect lib_bag 10
+expect lib_bag 6
 expect lib_seen 9
 expect lib_over 0
 tap SAVE
 tap EDIT
 
-# Ten questions make the round; the summary lists what to go over.
+# Ten questions make the round; the summary lists what to go over, each item once.
 expect lib_over 1
 expect lib_seen 10
 expect lib_first_try 0
-expect lib_missed 10
+expect lib_missed 6
 shot round-summary.png
 tap EDIT
 expect lib_over 0
 expect lib_seen 0
-expect lib_bag 11
+expect lib_bag 7
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
+expect lib_over 1
+tap EDIT
+expect lib_seen 0
+expect lib_reasked 1
+expect lib_bag 12
+tap SAVE
+tap EDIT
+tap SAVE
+tap EDIT
 tap SAVE
 tap EDIT
 tap SAVE
@@ -55,11 +92,12 @@ expect lib_bag 1
 reboot
 wait 600
 tap SEQ
-expect lib_item_id 21
+expect lib_kind 4
+expect lib_item_id 12
 reboot
 wait 947
 tap SEQ
-expect lib_item_id 12
+expect lib_item_id 9
 
 # A round of five, all right first time, offers the next level.
 tap ENV
@@ -185,7 +223,7 @@ wait 150
 key 16 up
 key 17 down
 wait 150
-expect lib_result 4
+expect lib_copy 1
 expect lib_box 0
 key 8 up
 key 12 up

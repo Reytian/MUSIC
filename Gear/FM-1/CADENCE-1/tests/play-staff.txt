@@ -1,5 +1,7 @@
 # Play from Staff: read the notes, play exactly what is written.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 tap GLO
 expect lib_page 1

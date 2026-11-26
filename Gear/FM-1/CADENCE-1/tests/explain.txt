@@ -1,0 +1,198 @@
+# Every shown answer carries the rule behind it. FX first gives a clue that leaves the answer to
+# the player: the rule of what was named, a way to read what was shown, or a heard question the
+# other way round. A second FX shows the answer. Wrong answers say what was right about them.
+wait 600
+teach 0
+level 1 5
+level 0 3
+level 4 3
+
+# A named interval: the clue is its rule, and the rule stays with the answer.
+activity 0 1
+tap SEQ
+ask 96
+wait 40
+title C + m6
+card Play the notes going up
+tap FX
+expect lib_clue 1
+expect lib_revealed 0
+expect lib_hinted 1
+card Minor 6th: 8 half steps, 6 letters
+tap FX
+expect lib_revealed 1
+card Minor 6th: 8 half steps, 6 letters
+shot explain-interval.png
+
+# Read from the staff, the clue is its number in letters; the half steps are left to count.
+activity 4 2
+ask 60
+wait 40
+tap FX
+card A 4th: count the half steps
+tap FX
+title C + A4
+card Augmented 4th: 6 half steps, 4 letters
+
+# A wrong interval of the same size in half steps is told to count letters; one of the same
+# number, to count half steps.
+ask 60
+wait 40
+spin PRESET 6
+tap EDIT
+expect lib_result 1
+card Same size: count the letters
+ask 108
+wait 40
+spin PRESET 8
+tap EDIT
+expect lib_result 1
+card Right number: count the half steps
+shot explain-right-number.png
+
+# A read note: the clue is the rhyme of the lines and spaces, the rule is the note's place in it.
+activity 4 0
+ask 24
+wait 40
+expect lib_note_letter 4
+expect lib_note_acc -1
+tap FX
+card Lines E G B D F, spaces F A C E
+spin PRESET 3
+spin ALGO 1
+tap EDIT
+expect lib_result 1
+card Same key, other letter: read the staff
+tap FX
+card Lines E G B D F: G is line 2
+
+# A key signature: the rule lists its signs in order, a minor key beside its relative major.
+activity 4 1
+ask 17
+wait 40
+expect lib_minor 1
+tap FX
+card Minor: 3 half steps below its major
+tap FX
+card Like Db major: Bb Eb Ab Db Gb
+ask 2
+wait 40
+tap FX
+card Next-to-last flat names the key
+tap FX
+card Bb Eb Ab Db Gb
+
+# Written on the staff: the right keys under the wrong letters, or the right letters with the
+# wrong signs, say so.
+activity 5 2
+ask 72
+wait 40
+title C + d5
+tapkey 13
+tap EDIT
+expect lib_result 1
+card Right keys: spell with other letters
+ask 24
+wait 40
+tapkey 11
+tap EDIT
+expect lib_result 1
+card Right letters: check the signs
+
+# Lit keys: count the half steps between them, or from the gold root.
+activity 6 1
+ask 96
+wait 40
+tap FX
+card 8 half steps apart
+activity 6 3
+ask 12
+wait 40
+tap FX
+card Half steps from the root: 3 7
+tap FX
+card Minor: 1 b3 5
+activity 6 0
+ask 3
+wait 40
+tap FX
+card Find C, left of the 2 black keys
+tap FX
+card Eb = D#: upper of the 2 black keys
+
+# Heard after C, a note's question says so. Its clue lights its key; its rule counts from C.
+activity 7 0
+ask 3
+wait 40
+card C sounds first: name the second
+expect lib_guides 0
+tap FX
+card Count up from C on the lit keys
+expect lib_guides 1024
+expect lib_revealed 0
+shot explain-ear-clue.png
+tap FX
+card Eb: 3 half steps above C
+
+# Heard and played back, the clue is the name: the keys are left to find.
+activity 2 1
+ask 96
+wait 40
+title Listen
+tap FX
+title C + m6
+card Now find it on the keys
+expect lib_guides 0
+
+# A scale read off the staff: the clue is its whole and half steps.
+activity 4 3
+ask 24
+wait 40
+tap FX
+card Steps: W H W W H W+H H
+tap FX
+card Harmonic minor: 1 2 b3 4 5 b6 7
+
+# Played from the staff, the clue names the note to start from.
+activity 1 3
+ask 0
+wait 40
+tap FX
+card Lowest note C4
+
+# Inside a key: count up from the tonic; a numeral is a chord of a quality on a degree.
+level 4 3
+activity 3 0
+ask 67
+wait 40
+tap FX
+card D is 1: count up the scale
+tap FX
+card D E F# G A: degree 5
+activity 3 1
+ask 60 0
+wait 40
+tap FX
+card Major triad on degree 5
+ask 60 1
+wait 40
+tap FX
+card Dominant seventh on degree 5
+activity 3 2
+ask 56
+wait 40
+tap FX
+card Roots on degrees 1 4 5 1
+
+# A sign of the key written into a read note is named in its rule.
+level 0 4
+activity 4 0
+ask 31 1024
+wait 40
+expect lib_fifths -1
+expect lib_note_letter 6
+expect lib_note_acc -1
+tap FX
+card Key signature: Bb
+tap FX
+card Lines E G B D F: B is line 3 (key: Bb)

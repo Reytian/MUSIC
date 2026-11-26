@@ -16,6 +16,22 @@ static int library_activity(void)
     return index;
 }
 
+/* Where an activity's best score is kept, and how SEQ finds it again after power off. */
+static int activity_slot(int group, int item)
+{
+    int index = item;
+    if (group == LIB_SIGHT && library_groups[group].kinds[item] == ITEM_MELODY)
+        return SLOT_STAFF_MELODY;
+    for (int before = 0; before < group; ++before)
+        index += library_groups[before].count;
+    return group > LIB_SIGHT ? index - 1 : index;
+}
+
+static int library_slot(void)
+{
+    return activity_slot(library.group, library.item);
+}
+
 static int kind_level(int kind)
 {
     switch (kind) {
@@ -110,6 +126,19 @@ static int library_concluded(void)
 static int library_revealed(void)
 {
     return library.show_answer || library_concluded();
+}
+
+/* The first hint on a heard question shows it the other way round: its keys when the answer is
+ * a name, its name when the answer is the keys. */
+static int clue_shows_keys(void)
+{
+    return library.clue && !library_revealed() && library_prompt() == PROMPT_SOUND &&
+           library_answer() == ANSWER_CHOICE;
+}
+
+static int clue_shows_name(void)
+{
+    return library.clue && library_prompt() == PROMPT_SOUND && library_answer() == ANSWER_PLAY;
 }
 
 static int library_quiz_open(void)
@@ -440,13 +469,17 @@ static int melody_move(int leaps)
     return (dice >> 16) & 1u ? size : -size;
 }
 
-/* A short tune in a major key that starts on the tonic and stays on the keys. */
+/* A short tune in a major key that starts on the tonic and stays on the keys. Read from the
+ * staff, it keeps to the staff until ledger lines are in play, and to C major until key
+ * signatures are; heard, it starts on a lit key. */
 static void build_melody(uint32_t random)
 {
-    int level = guided_level(LV_NOTES), base = base_key();
+    int level = guided_level(LV_NOTES), base = base_key(), staff = library_prompt() == PROMPT_STAFF;
     int length = level ? level + 2 : 5, leaps = level != 1 && level != 2;
     int lo = white_position(base, 1), hi = white_position(base + NKEYS - 1, -1);
-    library.fifths = mask_choice(major_keys_in_play(), random) - 7;
+    if (staff)
+        note_range(&lo, &hi);
+    library.fifths = staff && !content_signatures() ? 0 : mask_choice(major_keys_in_play(), random) - 7;
     int position = key_degree(library.fifths, 0, 0, 0).position;
     while (position < lo + 3)
         position += 7;
@@ -463,7 +496,8 @@ static void build_melody(uint32_t random)
         library.target[i] = key_note(position);
     }
     library.count = length;
-    library.given = library.target[0].midi;
+    if (!staff)
+        library.given = library.target[0].midi;
 }
 
 static void library_build(int item, uint32_t random)
@@ -568,7 +602,7 @@ static void library_finish(void)
     library.level_offer = prefs.guided && !library.review && library.seen >= MIN_ROUND &&
                           10 * library.first_try >= 9 * library.seen && progress.level[kind] < level_top[kind];
     if (limit) {
-        int rate = (library.first_try + prefs.timer / 2) / prefs.timer, activity = library_activity();
+        int rate = (library.first_try + prefs.timer / 2) / prefs.timer, activity = library_slot();
         if (rate > 255)
             rate = 255;
         library.new_best = rate > progress.best[activity];
@@ -586,6 +620,7 @@ static void library_reset_answer(void)
     int kind = library_kind();
     library.result = READY;
     library.misses = library.hinted = library.show_answer = 0;
+    library.clue = library.copy = library.teaching = library.reasked = 0;
     library.wait_release = 1;
     library.remark = 0;
     library.choice = library.choice_root = library.choice_accidental = 0;
@@ -627,18 +662,58 @@ static void library_pose(int item, uint32_t random, uint32_t now)
     study.dirty = 1;
 }
 
+/* Ask an item once more a few questions on, while it is still fresh. */
+static void library_ask_again(int item)
+{
+    if (library.review || library.again_count >= AGAIN_MAX)
+        return;
+    library.again[library.again_count] = (uint16_t)item;
+    library.again_due[library.again_count++] = library.asked + AGAIN_GAP;
+}
+
+static int teach_off;                     /* test scripts: "teach 0" to test the rest without lessons */
+
+/* An interval, chord or scale never answered on any root (heard as a whole, it has the one). */
+static int library_new_shape(void)
+{
+    int kind = library_kind();
+    if (teach_off || (kind != ITEM_INTERVAL && kind != ITEM_SCALE && kind != ITEM_CHORD && kind != ITEM_INVERSION))
+        return 0;
+    for (int root = 0; root < 12; ++root) {
+        int stat = item_stat(12 * library.quality + root);
+        if (stat < 0 || progress.box[stat] != BOX_NEW)
+            return 0;
+    }
+    return 1;
+}
+
+/* The first meeting with a shape shows it before it is asked: name, rule, staff, keys and sound.
+ * Played once (or passed with EDIT), it counts as seen with help and comes back as a question a
+ * few turns later. It is not one of the round's questions. */
+static void library_teach(void)
+{
+    library.teaching = 1;
+    library.copy = COPY_WAIT;
+    library.show_answer = 1;
+    if (!library.autoplay_at)
+        library.autoplay_at = library.shown_at + AUTOPLAY_MS;
+    progress_record(library.stat, SOLVED_HELPED);
+    library_ask_again(library.item_id);
+}
+
 static void library_question(uint32_t now)
 {
     if (library.seen >= library_round_length() && !library_time_limit()) {
         library_finish();
         return;
     }
-    int item;
+    int item, again = 0;
     if (library.review) {
         item = library.queue[library.queue_at++];
     } else if (library.again_count && library.again_due[0] <= library.asked) {
-        /* An item answered wrongly comes back a few questions later, while it is still fresh. */
+        /* An item missed or skipped comes back a few questions later, while it is still fresh. */
         item = library.again[0];
+        again = 1;
         --library.again_count;
         for (int i = 0; i < library.again_count; ++i) {
             library.again[i] = library.again[i + 1];
@@ -649,6 +724,9 @@ static void library_question(uint32_t now)
     }
     ++library.asked;
     library_pose(item, next_random(), now);
+    library.reasked = again;
+    if (!library.review && !library_time_limit() && library_new_shape())
+        library_teach();
 }
 
 static void library_round(uint32_t now, int review)
@@ -669,6 +747,11 @@ static void library_round(uint32_t now, int review)
 
 static void library_start(uint32_t now)
 {
+    int slot = library_slot() + 1;
+    if (prefs.spare != slot) {
+        prefs.spare = (uint8_t)slot;
+        resume_dirty = 1;
+    }
     library.page = LIB_TASK;
     library.collect = 0;
     library.last_item = -1;
@@ -703,6 +786,14 @@ static void note_missed(int item)
 
 static void library_conclude(int result, uint32_t now)
 {
+    if (library.copy) {                  /* the shown answer, played: nothing more to count */
+        library.copy = COPY_DONE;
+        library.result = library.teaching ? SKIPPED : MISSED;
+        if (prefs.advance)
+            library.advance_at = now + ADVANCE_MS;
+        study.dirty = 1;
+        return;
+    }
     int first = result == CORRECT && !library.misses && !library.hinted, outcome = SOLVED_NOT;
     uint32_t took = now - library.shown_at;
     if ((int32_t)took < 0)
@@ -720,28 +811,47 @@ static void library_conclude(int result, uint32_t now)
             library.advance_at = now + ADVANCE_MS;
     }
     library.first_try += first;
-    if (!first)
+    if (!first) {                        /* missed, skipped or helped: it comes round again soon, once */
         note_missed(library.item_id);
-    if (library.misses && !library.review && library.again_count < AGAIN_MAX) {
-        library.again[library.again_count] = (uint16_t)library.item_id;
-        library.again_due[library.again_count++] = library.asked + AGAIN_GAP;
+        if (!library.reasked)
+            library_ask_again(library.item_id);
     }
     progress_record(library.stat, outcome);
     library.autoplay_at = 0;
     study.dirty = 1;
 }
 
+/* A revealed answer to be played stays up and the keys keep listening: playing it once puts it
+ * in the hands as well as the eyes. */
+static void library_begin_copy(void)
+{
+    library.copy = COPY_WAIT;
+    library.result = READY;
+    library.show_answer = 1;
+    library.position = library.step = 0;
+    library.wrong_note = -1;
+    library.collected = library.checked = 0;
+    library.checked_keys = (NoteSet){{0}};
+    library.wait_release = 1;
+}
+
 static void library_wrong(uint32_t now, const char *remark)
 {
     int limit = reveal_after();
-    ++library.misses;
-    library.remark = remark;
     library.wrong_at = now;
     library.result = WRONG;
     study.dirty = 1;
+    if (library.copy) {                  /* a slip while copying the answer counts for nothing */
+        library.remark = 0;
+        return;
+    }
+    ++library.misses;
+    library.remark = remark;
     if (limit && library.misses >= limit) {
         library_conclude(MISSED, now);
         library_play(now, 0);
+        if (library_answer() == ANSWER_PLAY)
+            library_begin_copy();
     }
 }
 
@@ -777,22 +887,35 @@ static void library_submit(uint32_t now)
     if (kind == ITEM_SIGNATURE) {
         correct = library.choice == library.fifths;
     } else if (library_answer() == ANSWER_WRITE) {
+        /* Every wrong note on the right key is a spelling slip; on the right line, a sign slip. */
+        int keys = 1, lines = 1;
         library.wrong_slots = 0;
         for (int i = 0; i < library.count; ++i) {
-            if (!(library.filled & (1 << i)) || library.target[i].position != library.written[i].position ||
-                library.target[i].accidental != library.written[i].accidental)
+            StaffNote want = library.target[i], got = library.written[i];
+            int filled = (library.filled >> i) & 1;
+            if (!filled || want.position != got.position || want.accidental != got.accidental) {
                 library.wrong_slots |= 1u << i;
+                keys &= filled && got.midi == want.midi;
+                lines &= filled && got.position == want.position;
+            }
         }
         correct = !library.wrong_slots;
+        if (!correct && keys)
+            remark = "Right keys: spell with other letters";
+        else if (!correct && lines)
+            remark = "Right letters: check the signs";
     } else if (kind == ITEM_NOTE) {
         StaffNote target = library.target[0];
         int letter = positive_mod(target.position, 7) == library.choice;
+        int pitch = (natural_pitch[library.choice] + library.choice_accidental + 12) % 12;
         if (prompt == PROMPT_STAFF) {
             correct = letter && target.accidental == library.choice_accidental;
             if (letter && !correct)
                 remark = library.fifths ? "Right letter: mind the signature" : "Right letter: check the sign";
+            else if (!letter && pitch == target.midi % 12)
+                remark = "Same key, other letter: read the staff";
         } else {
-            correct = (natural_pitch[library.choice] + library.choice_accidental + 12) % 12 == target.midi % 12;
+            correct = pitch == target.midi % 12;
         }
     } else {
         correct = library.choice == library.quality;
@@ -803,6 +926,14 @@ static void library_submit(uint32_t now)
             correct = correct && root;
         } else if (!correct) {
             library.tried |= 1u << library.choice;
+            /* Seen intervals have a size in letters and one in half steps: say which is off. */
+            if (kind == ITEM_INTERVAL && prompt != PROMPT_SOUND) {
+                const Shape *got = &intervals[library.choice], *want = &intervals[library.quality];
+                if (got->semitones[1] == want->semitones[1])
+                    remark = "Same size: count the letters";
+                else if (got->degrees[1] == want->degrees[1])
+                    remark = "Right number: count the half steps";
+            }
         }
     }
     if (correct) {
@@ -858,6 +989,8 @@ static void library_key(int midi, uint32_t now)
     if (!library_active() || !library_quiz_open() || library.wait_release)
         return;
     int answer = library_answer(), mode = play_mode();
+    if (library.copy && answer != ANSWER_PLAY)
+        return;
     if (answer == ANSWER_WRITE) {
         StaffNote note = canonical_note(midi);
         int lo, hi;
@@ -941,7 +1074,7 @@ static void library_tick(uint32_t now)
         library.entry_changed = 0;
         library_check_chord(now, 0);
     }
-    if (library.result == CORRECT && library.advance_at && (int32_t)(now - library.advance_at) >= 0 &&
+    if (library.advance_at && library_concluded() && (int32_t)(now - library.advance_at) >= 0 &&
         !keys_any(&study.held) && !demo_playing())
         library_question(now);
 }
@@ -972,7 +1105,16 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
             library.hinted = 1;
         library_play(now, 0);
     }
-    if (library_concluded()) {
+    if (library.copy) {
+        /* The answer is up to be played once: EDIT or SKIP moves on, the keys' own controls work. */
+        if (press & ((1u << B_EDIT) | (1u << B_SAVE))) {
+            library_question(now);
+            return;
+        }
+        if (library.copy == COPY_DONE || answer != ANSWER_PLAY)
+            return;
+        press &= ~(1u << B_FX);
+    } else if (library_concluded()) {
         if (press & (1u << B_EDIT))
             library_question(now);
         return;
@@ -1022,9 +1164,14 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
     if ((select || algo || preset) && library.result == WRONG && answer != ANSWER_PLAY)
         library.result = READY;
 
-    if (press & (1u << B_FX)) {
+    if (press & (1u << B_FX)) {          /* first the rule or a clue, then the answer itself */
         library.hinted = 1;
-        library.show_answer ^= 1;
+        if (library.clue)
+            library.show_answer ^= 1;
+        else
+            library.clue = 1;
+        if (library.result == WRONG)     /* help asked for replaces the verdict on the card */
+            library.result = READY;
     }
     if ((press & (1u << B_ARP)) && may_collect()) {
         library.collect ^= 1;

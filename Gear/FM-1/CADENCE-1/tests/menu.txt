@@ -1,5 +1,7 @@
-# Every activity of the library opens from the menu: eight groups, thirty-four activities.
+# Every activity of the library opens from the menu: eight groups, thirty-five activities.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 expect lib_page 2
 tap GLO
@@ -139,6 +141,22 @@ shot activity-1-chord.png
 tap GLO
 expect lib_page 1
 spin PRESET 1
+tap EDIT
+expect lib_page 2
+expect lib_group 1
+expect lib_item 4
+expect lib_kind 6
+expect lib_activity 9
+expect lib_slot 34
+expect lib_result 0
+expect lib_seen 0
+expect lib_given -1
+expect lib_anchors 0
+wait 40
+shot activity-1-melody.png
+tap GLO
+expect lib_page 1
+spin PRESET 1
 expect lib_menu_item 0
 spin SELECT 1
 
@@ -148,7 +166,8 @@ expect lib_page 2
 expect lib_group 2
 expect lib_item 0
 expect lib_kind 0
-expect lib_activity 9
+expect lib_activity 10
+expect lib_slot 9
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -161,7 +180,7 @@ expect lib_page 2
 expect lib_group 2
 expect lib_item 1
 expect lib_kind 2
-expect lib_activity 10
+expect lib_activity 11
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -174,7 +193,7 @@ expect lib_page 2
 expect lib_group 2
 expect lib_item 2
 expect lib_kind 4
-expect lib_activity 11
+expect lib_activity 12
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -187,7 +206,7 @@ expect lib_page 2
 expect lib_group 2
 expect lib_item 3
 expect lib_kind 6
-expect lib_activity 12
+expect lib_activity 13
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -204,7 +223,7 @@ expect lib_page 2
 expect lib_group 3
 expect lib_item 0
 expect lib_kind 7
-expect lib_activity 13
+expect lib_activity 14
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -217,7 +236,7 @@ expect lib_page 2
 expect lib_group 3
 expect lib_item 1
 expect lib_kind 8
-expect lib_activity 14
+expect lib_activity 15
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -230,7 +249,7 @@ expect lib_page 2
 expect lib_group 3
 expect lib_item 2
 expect lib_kind 9
-expect lib_activity 15
+expect lib_activity 16
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -247,7 +266,7 @@ expect lib_page 2
 expect lib_group 4
 expect lib_item 0
 expect lib_kind 0
-expect lib_activity 16
+expect lib_activity 17
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -260,7 +279,7 @@ expect lib_page 2
 expect lib_group 4
 expect lib_item 1
 expect lib_kind 1
-expect lib_activity 17
+expect lib_activity 18
 expect lib_result 0
 expect lib_seen 0
 shot activity-4-signature.png
@@ -272,7 +291,7 @@ expect lib_page 2
 expect lib_group 4
 expect lib_item 2
 expect lib_kind 2
-expect lib_activity 18
+expect lib_activity 19
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -285,7 +304,7 @@ expect lib_page 2
 expect lib_group 4
 expect lib_item 3
 expect lib_kind 3
-expect lib_activity 19
+expect lib_activity 20
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -298,7 +317,7 @@ expect lib_page 2
 expect lib_group 4
 expect lib_item 4
 expect lib_kind 4
-expect lib_activity 20
+expect lib_activity 21
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -315,7 +334,7 @@ expect lib_page 2
 expect lib_group 5
 expect lib_item 0
 expect lib_kind 0
-expect lib_activity 21
+expect lib_activity 22
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -328,7 +347,7 @@ expect lib_page 2
 expect lib_group 5
 expect lib_item 1
 expect lib_kind 1
-expect lib_activity 22
+expect lib_activity 23
 expect lib_result 0
 expect lib_seen 0
 shot activity-5-signature.png
@@ -340,7 +359,7 @@ expect lib_page 2
 expect lib_group 5
 expect lib_item 2
 expect lib_kind 2
-expect lib_activity 23
+expect lib_activity 24
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -353,7 +372,7 @@ expect lib_page 2
 expect lib_group 5
 expect lib_item 3
 expect lib_kind 3
-expect lib_activity 24
+expect lib_activity 25
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -366,7 +385,7 @@ expect lib_page 2
 expect lib_group 5
 expect lib_item 4
 expect lib_kind 4
-expect lib_activity 25
+expect lib_activity 26
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -383,7 +402,7 @@ expect lib_page 2
 expect lib_group 6
 expect lib_item 0
 expect lib_kind 0
-expect lib_activity 26
+expect lib_activity 27
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -396,7 +415,7 @@ expect lib_page 2
 expect lib_group 6
 expect lib_item 1
 expect lib_kind 2
-expect lib_activity 27
+expect lib_activity 28
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -409,7 +428,7 @@ expect lib_page 2
 expect lib_group 6
 expect lib_item 2
 expect lib_kind 3
-expect lib_activity 28
+expect lib_activity 29
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -422,7 +441,7 @@ expect lib_page 2
 expect lib_group 6
 expect lib_item 3
 expect lib_kind 4
-expect lib_activity 29
+expect lib_activity 30
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -439,7 +458,7 @@ expect lib_page 2
 expect lib_group 7
 expect lib_item 0
 expect lib_kind 0
-expect lib_activity 30
+expect lib_activity 31
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -452,7 +471,7 @@ expect lib_page 2
 expect lib_group 7
 expect lib_item 1
 expect lib_kind 2
-expect lib_activity 31
+expect lib_activity 32
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -465,7 +484,7 @@ expect lib_page 2
 expect lib_group 7
 expect lib_item 2
 expect lib_kind 3
-expect lib_activity 32
+expect lib_activity 33
 expect lib_result 0
 expect lib_seen 0
 wait 40
@@ -478,7 +497,7 @@ expect lib_page 2
 expect lib_group 7
 expect lib_item 3
 expect lib_kind 4
-expect lib_activity 33
+expect lib_activity 34
 expect lib_result 0
 expect lib_seen 0
 wait 40

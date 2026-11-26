@@ -62,6 +62,8 @@ static const char *tritone_or(const Shape *shape)
     return one_tritone() && shape == &intervals[INTERVAL_A4] ? "TT" : shape->symbol;
 }
 
+#include "explain.h"
+
 /* What the question is, in words: the prompt of a name question, the answer of the others. */
 static void library_target_title(char *out)
 {
@@ -119,8 +121,10 @@ static const char *library_instruction(void)
         return playing_text;
     if (library_answer() == ANSWER_WRITE)
         return kind == ITEM_SIGNATURE ? "Set the sharps or flats" : "Write it on the staff";
+    if (library_answer() == ANSWER_CHOICE && sound)
+        return kind == ITEM_NOTE ? "C sounds first: name the second" : "Choose what you heard";
     if (library_answer() == ANSWER_CHOICE)
-        return sound ? "Choose what you heard" : "Choose, then press EDIT";
+        return "Choose, then press EDIT";
     if (kind == ITEM_PROGRESSION)
         return "Hold each chord, lifting between";
     if (kind == ITEM_INVERSION)
@@ -131,6 +135,8 @@ static const char *library_instruction(void)
         return "C sounded first: play the other";
     if (sound)
         return mode == PLAY_EXACT ? "Play it back from the lit key" : "Hold it, starting on the lit key";
+    if (kind == ITEM_MELODY)
+        return "Play the notes in order";
     if (mode == PLAY_PITCH_SET)
         return "Hold all the chord tones";
     if (mode == PLAY_EXACT_SET)
@@ -150,7 +156,7 @@ static uint32_t library_guide_keys(void)
 {
     if (library.over || library_kind() == ITEM_PROGRESSION)
         return 0;
-    return library_revealed() || library_prompt() == PROMPT_KEYS ? library_all_keys() : 0;
+    return library_revealed() || library_prompt() == PROMPT_KEYS || clue_shows_keys() ? library_all_keys() : 0;
 }
 
 /* Keys marked without giving the answer away: where to start, a chord's root, notes tapped in. */
@@ -192,7 +198,7 @@ static uint32_t library_wrong_keys(void)
 
 static uint32_t library_sound_lights(void)
 {
-    return library_prompt() == PROMPT_SOUND && !library_revealed() ? 0 : demo_lights();
+    return library_prompt() == PROMPT_SOUND && !library_revealed() && !clue_shows_keys() ? 0 : demo_lights();
 }
 
 static void library_item_title(int item, char *out)
@@ -300,47 +306,57 @@ static void library_counter(char out[12])
         char *p = append_text(append_number(out, (int)(left / 60u)), left % 60u < 10u ? ":0" : ":");
         append_number(p, (int)(left % 60u));
     } else {
-        char *p = append_text(append_number(out, library.seen + library_quiz_open()), "/");
+        char *p = append_text(append_number(out, library.seen + (library_quiz_open() && !library.copy)), "/");
         append_number(p, library_round_length());
     }
 }
 
+#ifdef PLAT_HOST
+static char drawn_title[64], drawn_detail[64];   /* the card's two lines as last drawn (for the tests) */
+#endif
 
+
+/* The card: what is asked (or, once shown, the answer), and under it the instruction, the
+ * verdict, or the rule behind the answer. Shown answers trade the counter for why they show. */
 static void library_task_top(void)
 {
-    int kind = library_kind(), revealed = library_revealed(), named = library_prompt() == PROMPT_NAME;
-    char heading[32], title[56] = "", counter[12];
-    const char *detail = library_instruction();
+    int kind = library_kind(), revealed = library_revealed();
+    int named = library_prompt() == PROMPT_NAME || clue_shows_name();
+    char heading[32], title[56] = "", counter[12], rule[64];
+    const char *detail = library_instruction(), *tag = 0;
     uint16_t detail_color = STUDY_MUTED, accent = STUDY_MINT;
     drawn_playing = 0;
 
     append_text(heading, kind_names[kind]);
     if (library_group() == &library_groups[LIB_INKEY] && !library.over)
         key_text(heading, library.fifths, library.minor);
+    if (library.teaching)
+        tag = "New";
+    else if (library.copy || library.result == MISSED)
+        tag = "Missed";
+    else if (library.result == SKIPPED)
+        tag = "Skipped";
     if (library.over) {
         append_text(title, library.review ? "Review complete" : (library_time_limit() ? "Time is up" : "Round complete"));
         detail = "First try, without hints";
     } else if (library.result == CORRECT) {
         detail = "Correct";
         detail_color = STUDY_MINT;
-    } else if (library.result == SKIPPED) {
-        detail = "Skipped";
-        detail_color = STUDY_GOLD;
-    } else if (library.result == MISSED) {
-        detail = "Missed: this is the answer";
-        detail_color = accent = STUDY_GOLD;
     } else if (library.result == WRONG) {
-        detail = library.remark ? library.remark : "Try again";
+        detail = library.copy ? "Play the lit keys" : (library.remark ? library.remark : "Try again");
         detail_color = accent = STUDY_RED;
-    } else if (library.show_answer) {
-        detail = "Hint";
+    } else if (revealed || library.clue) {
+        library_explain(rule, !revealed);
+        detail = rule;
         detail_color = STUDY_GOLD;
+        if (tag && !library.teaching)
+            accent = STUDY_GOLD;
     }
 
     draw_header(heading, library_group()->name, accent);
     if (!library.over) {
         library_counter(counter);
-        text_right(221, 53, &FONT_T, counter, STUDY_MUTED);
+        text_right(221, 53, &FONT_T, tag ? tag : counter, tag ? STUDY_GOLD : STUDY_MUTED);
         if (named || revealed)
             library_target_title(title);
         else
@@ -349,7 +365,7 @@ static void library_task_top(void)
     if (!library.over && kind == ITEM_ROMAN) {
         RomanLabel label = roman_label(library.fifths, library.minor, library.degree, 0, library.type, 0);
         draw_roman(21, 48, &label, STUDY_INK);
-        cv_text(21, 71, &FONT_XS, detail, detail_color);
+        draw_card_detail(detail, detail_color);
     } else if (!library.over && kind == ITEM_PROGRESSION) {
         for (int step = 0, x = 21; step < library.steps; ++step) {
             RomanLabel label = progression_label(step);
@@ -357,11 +373,15 @@ static void library_task_top(void)
             x = draw_roman(x, 48, &label, step == library.step && !library_concluded() ? STUDY_MINT :
                            (ahead ? STUDY_MUTED : STUDY_INK)) + 12;
         }
-        cv_text(21, 71, &FONT_XS, detail, detail_color);
+        draw_card_detail(detail, detail_color);
     } else {
         draw_card_text(title, detail, detail_color, library.over ? 202 : 166);
     }
     drawn_playing = detail == playing_text;
+#ifdef PLAT_HOST
+    append_text(drawn_title, title);
+    append_text(drawn_detail, detail);
+#endif
     cv_blit(0, 0);
 }
 
@@ -464,15 +484,8 @@ static const char *chord_symbol(const StaffNote *notes, int column)
     int size = 1;
     while (notes + size < library.target + library.count && library.column[notes + size - library.target] == column)
         ++size;
-    for (int quality = 0; quality < chord_quality_count(); ++quality) {
-        const Shape *shape = chord_shape(quality);
-        int same = shape->count == size;
-        for (int i = 1; same && i < size; ++i)
-            same = notes[i].midi - notes[0].midi == shape->semitones[i];
-        if (same)
-            return shape->symbol;
-    }
-    return "";
+    const Shape *shape = matching_chord(notes, size);
+    return shape ? shape->symbol : "";
 }
 
 static void library_answer_names(char out[56])
@@ -517,7 +530,7 @@ static void library_summary(void)
         if (library.new_best)
             append_text(p, "    New best");
         else
-            append_number(append_text(p, "    best "), progress.best[library_activity()]);
+            append_number(append_text(p, "    best "), progress.best[library_slot()]);
         cv_text(12, 43, &FONT_XS, line, library.new_best ? STUDY_GOLD : STUDY_MUTED);
     }
 
@@ -558,12 +571,13 @@ static void library_summary(void)
 static void library_task_bottom(void)
 {
     int kind = library_kind(), answer = library_answer(), prompt = library_prompt();
-    int shown = library_revealed(), open = library_quiz_open();
+    int shown = library_revealed(), open = library_quiz_open() && !library.copy;
+    int copying = library.copy == COPY_WAIT && answer == ANSWER_PLAY;
     int write = answer == ANSWER_WRITE && !shown;
     int staff = shown || prompt == PROMPT_STAFF || answer == ANSWER_WRITE;
     int grid = answer == ANSWER_CHOICE && !shown;
     uint32_t guides = library_guide_keys(), anchors = library_anchor_keys(), wrong = library_wrong_keys();
-    char line[56] = "";
+    char line[80] = "";
 
     cv_begin(240, LOWER_HEIGHT, STUDY_BG);
     if (staff) {
@@ -590,7 +604,7 @@ static void library_task_bottom(void)
     }
 
     if (shown) {
-        library_answer_names(line);
+        library_answer_names(copying ? append_text(line, "Play it:  ") : line);
     } else if (write && kind == ITEM_SIGNATURE) {
         int signs = library.choice < 0 ? -library.choice : library.choice;
         append_text(append_number(line, signs), library.choice < 0 ? " flats" : (signs ? " sharps" : " sharps or flats"));
@@ -603,7 +617,7 @@ static void library_task_bottom(void)
 
     if (grid && prompt == PROMPT_STAFF) {
         draw_choices(80, 38);
-    } else if (grid && prompt == PROMPT_KEYS) {
+    } else if (grid && (prompt == PROMPT_KEYS || clue_shows_keys())) {
         draw_keyboard(2, 40, guides, library_sound_lights(), anchors, wrong);
         draw_choices(48, 70);
     } else if (grid) {
@@ -641,11 +655,17 @@ static void library_task_bottom(void)
             control_label(162, 120, "SELECT", "Activity");
         if (kind != ITEM_SIGNATURE)
             control_label(11, 130, "PLAY", "Hear");
+    } else if (copying) {
+        control_label(11, 120, "SELECT", "Activity");
+        if (may_collect())
+            control_label(91, 120, "ARP", library.collect ? "Tap" : "Hold");
+        control_label(162, 120, "REC", holds_keys() ? "Clear" : "Restart");
+        control_label(11, 130, "PLAY", "Hear");
     } else if (kind != ITEM_SIGNATURE) {
         control_label(11, 130, "PLAY", "Hear");
     }
     if (open) {
-        control_label(162, 130, "FX", library.show_answer ? "Hide" : "Hint");
+        control_label(162, 130, "FX", library.show_answer ? "Hide" : (library.clue ? "Answer" : "Hint"));
         control_label(11, 140, "SAVE", "Skip");
     }
     if (!open || answer != ANSWER_PLAY || holds_keys())
@@ -663,8 +683,8 @@ static void library_lights(void)
         return;
     }
     if (!library.over) {
-        controls |= (1u << B_FX) | (1u << B_SAVE) | (may_collect() ? 1u << B_ARP : 0);
-        if (demo_playing() || library.result == CORRECT)
+        controls |= (library.copy ? 0 : 1u << B_FX) | (1u << B_SAVE) | (may_collect() ? 1u << B_ARP : 0);
+        if (demo_playing() || library.result == CORRECT || library.copy == COPY_DONE)
             buttons |= LED_PLAY_GREEN;
         if (library.wrong_at)                /* PLAY turns red while a miss registers */
             buttons |= 1u << B_PLAY;
@@ -755,7 +775,15 @@ static int library_expect(const char *what, int *got)
     else if (!strcmp(what, "lib_item_id")) *got = library.item_id;
     else if (!strcmp(what, "lib_items")) *got = item_total();
     else if (!strcmp(what, "lib_box")) *got = library.stat < 0 ? -1 : progress.box[library.stat];
-    else if (!strcmp(what, "lib_best")) *got = progress.best[library_activity()];
+    else if (!strcmp(what, "lib_best")) *got = progress.best[library_slot()];
+    else if (!strcmp(what, "lib_slot")) *got = library_slot();
+    else if (!strcmp(what, "lib_clue")) *got = library.clue;
+    else if (!strcmp(what, "lib_shown")) *got = library.show_answer;
+    else if (!strcmp(what, "lib_copy")) *got = library.copy;
+    else if (!strcmp(what, "lib_teaching")) *got = library.teaching;
+    else if (!strcmp(what, "lib_reasked")) *got = library.reasked;
+    else if (!strcmp(what, "spare")) *got = prefs.spare;
+    else if (!strcmp(what, "resume_dirty")) *got = resume_dirty;
     else if (!strcmp(what, "lib_given")) *got = library.given;
     else if (!strcmp(what, "lib_note_letter")) *got = positive_mod(library.target[0].position, 7);
     else if (!strcmp(what, "lib_note_acc")) *got = library.target[0].accidental;

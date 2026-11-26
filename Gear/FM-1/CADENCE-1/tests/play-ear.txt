@@ -1,5 +1,7 @@
 # Play by Ear: the question plays by itself, with the starting key lit.
 wait 600
+teach 0
+activity 0 3
 tap SEQ
 tap GLO
 spin SELECT 2
