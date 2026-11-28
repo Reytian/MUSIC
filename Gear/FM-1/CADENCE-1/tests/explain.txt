@@ -39,13 +39,13 @@ card Augmented 4th: 6 half steps, 4 letters
 ask 60
 wait 40
 spin PRESET 6
-tap EDIT
+tap REC
 expect lib_result 1
 card Same size: count the letters
 ask 108
 wait 40
 spin PRESET 8
-tap EDIT
+tap REC
 expect lib_result 1
 card Right number: count the half steps
 shot explain-right-number.png
@@ -60,7 +60,7 @@ tap FX
 card Lines E G B D F, spaces F A C E
 spin PRESET 3
 spin ALGO 1
-tap EDIT
+tap REC
 expect lib_result 1
 card Same key, other letter: read the staff
 tap FX
@@ -89,13 +89,13 @@ ask 72
 wait 40
 title C + d5
 tapkey 13
-tap EDIT
+tap REC
 expect lib_result 1
 card Right keys: spell with other letters
 ask 24
 wait 40
 tapkey 11
-tap EDIT
+tap REC
 expect lib_result 1
 card Right letters: check the signs
 

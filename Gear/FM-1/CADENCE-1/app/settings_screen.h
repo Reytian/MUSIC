@@ -26,7 +26,7 @@ static void settings_value(int item, char out[24])
         else
             append_text(out, "Off");
         return;
-    case SET_ADVANCE: append_text(out, draft->advance ? "Automatic" : "Press EDIT"); return;
+    case SET_ADVANCE: append_text(out, draft->advance ? "Automatic" : "Press REC"); return;
     case SET_REVEAL: append_text(out, reveals[draft->reveal]); return;
     case SET_CONTENT: append_text(out, draft->guided ? "Levels" : "Custom"); return;
     case SET_INTERVALS:
@@ -80,8 +80,8 @@ static void settings_frame(uint32_t now)
     library_title_bar("Settings", "CADENCE-1");
     char place[12];
     append_number(append_text(append_number(place, selected + 1), " of "), count);
-    cv_caps(12, 32, &FONT_T, "Changes apply when saved", STUDY_MUTED);
-    text_right(228, 32, &FONT_T, place, STUDY_MUTED);
+    cv_caps(12, 31, &FONT_XS, "Changes apply when saved", STUDY_MUTED);
+    text_right(228, 31, &FONT_XS, place, STUDY_MUTED);
     cv_blit(0, 0);
 
     /* The lower band is split to keep the shared canvas within its limits. */
@@ -92,8 +92,8 @@ static void settings_frame(uint32_t now)
         char value[24];
         settings_value(item, value);
         cv_rect(11, y, 218, 12, chosen ? STUDY_MINT : STUDY_CARD);
-        cv_caps(17, y, &FONT_T, settings_labels[item], chosen ? STUDY_BG : STUDY_INK);
-        text_right(222, y, &FONT_T, value, chosen ? STUDY_BG : STUDY_MUTED);
+        cv_caps(17, y - 2, &FONT_XS, settings_labels[item], chosen ? STUDY_BG : STUDY_INK);
+        text_right(222, y - 2, &FONT_XS, value, chosen ? STUDY_BG : STUDY_MUTED);
     }
     cv_blit(0, 45);
 
@@ -105,7 +105,7 @@ static void settings_frame(uint32_t now)
         cv_rect(11, 0, 218, 30, STUDY_CARD);
         cv_text(17, 6, &FONT_XS, settings_option_shape()->name, STUDY_INK);
         int included = *mask & (1u << settings.option);
-        text_right(221, 8, &FONT_T, included ? "Included" : "Off", included ? STUDY_MINT : STUDY_MUTED);
+        text_right(221, 6, &FONT_XS, included ? "Included" : "Off", included ? STUDY_MINT : STUDY_MUTED);
     } else if (settings_is_level(settings.item)) {
         int kind = settings.item - SET_LEVEL;
         cv_rect(11, 0, 218, 30, STUDY_CARD);

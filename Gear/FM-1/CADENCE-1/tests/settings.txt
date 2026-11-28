@@ -65,7 +65,7 @@ expect settings_open 0
 expect pref_clef 2
 expect pref_length 5
 
-# Three misses before the answer shows, and no moving on until EDIT.
+# Three misses before the answer shows, and no moving on until REC (or EDIT, with no keys to clear).
 teach 0
 activity 0 3
 tap SEQ
@@ -91,6 +91,9 @@ key 1 up
 key 4 up
 wait 1500
 tap EDIT
+expect lib_copy 1
+tap REC
+expect lib_copy 0
 ask 0
 wait 40
 key 19 down

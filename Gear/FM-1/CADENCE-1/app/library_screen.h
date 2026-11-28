@@ -124,7 +124,7 @@ static const char *library_instruction(void)
     if (library_answer() == ANSWER_CHOICE && sound)
         return kind == ITEM_NOTE ? "C sounds first: name the second" : "Choose what you heard";
     if (library_answer() == ANSWER_CHOICE)
-        return "Choose, then press EDIT";
+        return "Choose, then press REC";
     if (kind == ITEM_PROGRESSION)
         return "Hold each chord, lifting between";
     if (kind == ITEM_INVERSION)
@@ -253,7 +253,7 @@ static void library_menu_rows(int offset, int height)
         if (y < 0 || y + 17 > height)
             continue;
         cv_rect(11, y, 86, 17, active ? STUDY_MINT : STUDY_CARD);
-        cv_text(16, y + 1, &FONT_XS, library_groups[i].short_name, active ? STUDY_BG : STUDY_MUTED);
+        cv_text(16, y, &FONT_B, library_groups[i].short_name, active ? STUDY_BG : STUDY_MUTED);
     }
     for (int i = 0; i < group->count; ++i) {
         int y = 34 + 19 * i - offset, active = library.menu_item == i;
@@ -263,9 +263,9 @@ static void library_menu_rows(int offset, int height)
         cv_rect(103, y, 126, 17, STUDY_CARD);
         if (active)
             cv_rect(103, y, 2, 17, STUDY_MINT);
-        cv_text(111, y + 1, &FONT_XS, kind_names[group->kinds[i]], active ? STUDY_INK : STUDY_MUTED);
+        cv_text(111, y, &FONT_B, kind_names[group->kinds[i]], active ? STUDY_INK : STUDY_MUTED);
         if (running)
-            text_right(224, y + 3, &FONT_T, "Open", STUDY_MINT);
+            text_right(224, y + 1, &FONT_XS, "Open", STUDY_MINT);
     }
 }
 
@@ -281,7 +281,10 @@ static void library_draw_menu(void)
 
     cv_begin(240, 130, STUDY_BG);
     library_menu_rows(110, 130);
-    cv_text(12, 78, &FONT_XS, group->about, STUDY_INK);
+    if (text_w(&FONT_B, group->about) <= 216)
+        cv_text(12, 74, &FONT_B, group->about, STUDY_INK);
+    else
+        cv_text(12, 76, &FONT_XS, group->about, STUDY_INK);
     p = append_text(line, level_names[level]);
     if (prefs.guided) {
         p = append_number(append_text(p, " level "), progress.level[level]);
@@ -289,12 +292,9 @@ static void library_draw_menu(void)
     } else {
         append_text(p, ": custom");
     }
-    cv_caps(12, 93, &FONT_T, line, STUDY_MUTED);
-    cv_rect(11, 106, 218, 1, STUDY_LINE);
-    control_label(11, 108, "SELECT", "Group");
-    control_label(118, 108, "PRESET", "Activity");
-    control_label(11, 118, "EDIT", "Open");
-    control_label(118, 118, "GLO", "Back");
+    cv_caps(12, 90, &FONT_XS, line, STUDY_MUTED);
+    static const Hint hints[] = {{"SELECT", "Group"}, {"PRESET", "Activity"}, {"REC", "Open"}, {"GLO", "Back"}};
+    draw_hints(130, hints_top(130, 2), hints, 4);
     cv_blit(0, 110);
 }
 
@@ -354,9 +354,13 @@ static void library_task_top(void)
     }
 
     draw_header(heading, library_group()->name, accent);
+    int room = 202;
     if (!library.over) {
+        char corner[48];
         library_counter(counter);
-        text_right(221, 53, &FONT_T, tag ? tag : counter, tag ? STUDY_GOLD : STUDY_MUTED);
+        caps_copy(corner, tag ? tag : counter);
+        text_right(221, 51, &FONT_XS, corner, tag ? STUDY_GOLD : STUDY_MUTED);
+        room = 194 - text_w(&FONT_XS, corner);
         if (named || revealed)
             library_target_title(title);
         else
@@ -375,7 +379,7 @@ static void library_task_top(void)
         }
         draw_card_detail(detail, detail_color);
     } else {
-        draw_card_text(title, detail, detail_color, library.over ? 202 : 166);
+        draw_card_text(title, detail, detail_color, room);
     }
     drawn_playing = detail == playing_text;
 #ifdef PLAT_HOST
@@ -385,9 +389,14 @@ static void library_task_top(void)
     cv_blit(0, 0);
 }
 
+/* A choice in the grid: in the bold face when the cell has room for it. */
 static void draw_cell(int x, int y, int w, int h, const char *label, int selected, int tried)
 {
-    const felucca_font_t *font = h >= 17 ? &FONT_XS : &FONT_T;
+    const felucca_font_t *font = &FONT_T;
+    if (h >= 19 && text_w(&FONT_B, label) <= w - 5)
+        font = &FONT_B;
+    else if (h >= 17 && text_w(&FONT_XS, label) <= w - 3)
+        font = &FONT_XS;
     cv_rect(x, y, w - 1, h - 1, selected ? STUDY_MINT : STUDY_CARD);
     cv_text(x + (w - 1 - text_w(font, label)) / 2, y + (h - 1 - font->h) / 2, font, label,
             selected ? STUDY_BG : (tried ? STUDY_RED : STUDY_INK));
@@ -509,9 +518,29 @@ static void library_answer_names(char out[56])
         p = note_text(i ? append_text(p, " ") : p, library.target[i], 0);
 }
 
+/* A line in the bold face if it fits the width, else the small one. */
+static void draw_line(int y, const char *text, uint16_t color)
+{
+    if (text_w(&FONT_B, text) <= 216)
+        cv_text(12, y, &FONT_B, text, color);
+    else
+        cv_text(12, y + 1, &FONT_XS, text, color);
+}
+
 static void library_summary(void)
 {
     char line[72], *p;
+    Hint hints[5] = {{"REC", "New round"}};
+    int count = 1;
+    if (library.missed_count)
+        hints[count++] = (Hint){"SEL", "Retry missed"};
+    if (library.level_offer)
+        hints[count++] = (Hint){"SAVE", "Level up"};
+    hints[count++] = (Hint){"GLO", "Library"};
+    hints[count++] = (Hint){"ENV", "Settings"};
+    int top = hints_top(LOWER_HEIGHT, hint_rows(hints, count));
+    int below = library.level_offer ? top - 19 : top - 2;    /* where the missed names stop */
+
     cv_begin(240, LOWER_HEIGHT, STUDY_BG);
     p = append_number(line, library.first_try);
     append_text(append_number(append_text(p, " / "), library.seen), " first try");
@@ -523,7 +552,7 @@ static void library_summary(void)
         p = append_number(append_text(p, "    average "), (int)(tenths / 10u));
         append_text(append_number(append_text(p, "."), (int)(tenths % 10u)), " s");
     }
-    cv_text(12, 27, &FONT_XS, line, STUDY_INK);
+    draw_line(26, line, STUDY_INK);
     if (library_time_limit()) {
         p = append_number(line, (library.first_try + prefs.timer / 2) / prefs.timer);
         p = append_text(p, " a minute");
@@ -531,39 +560,32 @@ static void library_summary(void)
             append_text(p, "    New best");
         else
             append_number(append_text(p, "    best "), progress.best[library_slot()]);
-        cv_text(12, 43, &FONT_XS, line, library.new_best ? STUDY_GOLD : STUDY_MUTED);
+        draw_line(43, line, library.new_best ? STUDY_GOLD : STUDY_MUTED);
     }
 
     if (library.missed_count) {
-        int y = 61, x = 12;
-        cv_caps(12, 61, &FONT_T, "Go over", STUDY_MUTED);
-        x = 60;
-        for (int i = 0; i < library.missed_count && y < 100; ++i) {
+        int y = 62, x = 12;
+        x = cv_caps(12, y + 1, &FONT_XS, "Go over", STUDY_MUTED) + 9;
+        for (int i = 0; i < library.missed_count; ++i) {
             library_item_title(library.missed[i], line);
-            if (x + text_w(&FONT_XS, line) > 228) {
+            if (x + text_w(&FONT_B, line) > 228) {
                 x = 12;
-                y += 15;
+                y += 17;
             }
-            if (y < 100)
-                x = cv_text(x, y - 2, &FONT_XS, line, STUDY_INK) + 9;
+            if (y + 16 > below)
+                break;
+            x = cv_text(x, y, &FONT_B, line, STUDY_INK) + 10;
         }
     } else if (library.seen) {
-        cv_text(12, 61, &FONT_XS, "Nothing missed.", STUDY_MUTED);
+        cv_text(12, 62, &FONT_B, "Nothing missed.", STUDY_MUTED);
     }
     if (library.level_offer) {
         int level = kind_level(library_kind());
         p = append_number(append_text(append_text(line, level_names[level]), " level "), progress.level[level] + 1);
         append_text(append_text(p, ": "), level_text[level][progress.level[level]]);
-        cv_text(12, 102, &FONT_XS, line, STUDY_GOLD);
+        draw_line(top - 18, line, STUDY_GOLD);
     }
-    cv_rect(11, 118, 218, 1, STUDY_LINE);
-    control_label(11, 120, "EDIT", "New round");
-    if (library.missed_count)
-        control_label(118, 120, "SEL", "Retry missed");
-    if (library.level_offer)
-        control_label(11, 131, "SAVE", "Level up");
-    control_label(118, 131, "GLO", "Library");
-    control_label(11, 141, "ENV", "Settings");
+    draw_hints(LOWER_HEIGHT, top, hints, count);
     draw_notice();
     cv_blit(0, TOP_HEIGHT);
 }
@@ -577,7 +599,59 @@ static void library_task_bottom(void)
     int staff = shown || prompt == PROMPT_STAFF || answer == ANSWER_WRITE;
     int grid = answer == ANSWER_CHOICE && !shown;
     uint32_t guides = library_guide_keys(), anchors = library_anchor_keys(), wrong = library_wrong_keys();
+    const Hint arp = may_collect() ? (Hint){"ARP", library.collect ? "Tap" : "Hold"} : (Hint){0, 0};
+    const Hint clear = {"EDIT", holds_keys() ? "Clear" : "Restart"};
+    const Hint hint = {"FX", library.show_answer ? "Hide" : (library.clue ? "Answer" : "Hint")};
+    const Hint hear = kind != ITEM_SIGNATURE ? (Hint){"PLAY", "Hear"} : (Hint){0, 0};
+    const Hint skip = {"SAVE", "Skip"}, library_hint = {"GLO", "Library"}, none = {0, 0};
+    Hint hints[9];
+    int count = 0;
     char line[80] = "";
+
+    /* The last row is the same in every state: FX, PLAY and REC, in the panel's order. */
+    if (open && write && kind != ITEM_SIGNATURE) {
+        hints[count++] = (Hint){"SELECT", "Slot"};
+        hints[count++] = (Hint){"ALGO", "Line"};
+        hints[count++] = (Hint){"PRESET", "Sign"};
+        hints[count++] = (Hint){"SEL", "Set"};
+        hints[count++] = (Hint){"EDIT", "Erase"};
+        hints[count++] = skip;
+        hints[count++] = hint;
+        hints[count++] = hear;
+        hints[count++] = (Hint){"REC", "Check"};
+    } else if (open && answer == ANSWER_PLAY) {
+        hints[count++] = arp;
+        hints[count++] = clear;
+        hints[count++] = skip;
+        hints[count++] = hint;
+        hints[count++] = hear;
+        hints[count++] = holds_keys() ? (Hint){"REC", "Check"} : none;
+    } else if (open) {                   /* choices, and a key signature to write */
+        hints[count++] = (Hint){"PRESET", kind == ITEM_NOTE ? "Note" : (write ? "Signs" : "Pick")};
+        if (kind == ITEM_NOTE && (content_roots(LV_NOTES) == 0xFFFu || library.fifths))
+            hints[count++] = (Hint){"ALGO", "Sign"};
+        else if (kind == ITEM_CHORD && prompt != PROMPT_SOUND)
+            hints[count++] = (Hint){"ALGO", "Root"};
+        else
+            hints[count++] = none;
+        hints[count++] = skip;
+        hints[count++] = hint;
+        hints[count++] = hear;
+        hints[count++] = (Hint){"REC", "Check"};
+    } else if (copying) {
+        hints[count++] = arp;
+        hints[count++] = clear;
+        hints[count++] = library_hint;
+        hints[count++] = none;
+        hints[count++] = hear;
+        hints[count++] = (Hint){"REC", "Next"};
+    } else {
+        hints[count++] = library_hint;
+        hints[count++] = hear;
+        hints[count++] = (Hint){"REC", "Next"};
+    }
+    /* Room for the most rows this kind of question shows, so nothing above moves from state to state. */
+    int top = hints_top(LOWER_HEIGHT, answer == ANSWER_WRITE && kind != ITEM_SIGNATURE ? 3 : 2);
 
     cv_begin(240, LOWER_HEIGHT, STUDY_BG);
     if (staff) {
@@ -616,74 +690,39 @@ static void library_task_bottom(void)
     }
 
     if (grid && prompt == PROMPT_STAFF) {
-        draw_choices(80, 38);
+        draw_choices(80, top - 82);
     } else if (grid && (prompt == PROMPT_KEYS || clue_shows_keys())) {
         draw_keyboard(2, 40, guides, library_sound_lights(), anchors, wrong);
-        draw_choices(48, 70);
+        draw_choices(48, top - 50);
     } else if (grid) {
-        draw_choices(6, 110);
+        draw_choices(6, top - 8);
     } else if (staff) {
         draw_score_readout(line, STUDY_MINT);
-        draw_keyboard(SCORE_KEYS_Y, 117 - SCORE_KEYS_Y, guides, library_sound_lights(), anchors, wrong);
+        draw_keyboard(SCORE_KEYS_Y, top - 1 - SCORE_KEYS_Y, guides, library_sound_lights(), anchors, wrong);
     } else {
         cv_rect(11, 0, 218, 24, STUDY_CARD);
-        cv_text(21, 5, &FONT_XS, line, STUDY_MUTED);
-        draw_keyboard(52, 65, guides, library_sound_lights(), anchors, wrong);
+        cv_text(21, 4, &FONT_B, line, STUDY_MUTED);
+        draw_keyboard(52, top - 1 - 52, guides, library_sound_lights(), anchors, wrong);
     }
-
-    cv_rect(11, 118, 218, 1, STUDY_LINE);
-    if (open && write && kind != ITEM_SIGNATURE) {
-        control_label(11, 120, "SELECT", "Slot");
-        control_label(91, 120, "ALGO", "Line");
-        control_label(162, 120, "PRESET", "Sign");
-        control_label(11, 130, "SEL", "Set");
-        control_label(91, 130, "REC", "Erase");
-    } else if (open && answer == ANSWER_PLAY) {
-        control_label(11, 120, "SELECT", "Activity");
-        if (may_collect())
-            control_label(91, 120, "ARP", library.collect ? "Tap" : "Hold");
-        control_label(162, 120, "REC", holds_keys() ? "Clear" : "Restart");
-        control_label(11, 130, "PLAY", "Hear");
-        control_label(91, 130, "OCT", "Octave");
-    } else if (open) {
-        control_label(11, 120, "PRESET", kind == ITEM_NOTE ? "Letter" : (write ? "Signs" : "Answer"));
-        if (kind == ITEM_NOTE && (content_roots(LV_NOTES) == 0xFFFu || library.fifths))
-            control_label(91, 120, "ALGO", "Sign");
-        else if (kind == ITEM_CHORD && prompt != PROMPT_SOUND)
-            control_label(91, 120, "ALGO", "Root");
-        if (answer != ANSWER_WRITE)
-            control_label(162, 120, "SELECT", "Activity");
-        if (kind != ITEM_SIGNATURE)
-            control_label(11, 130, "PLAY", "Hear");
-    } else if (copying) {
-        control_label(11, 120, "SELECT", "Activity");
-        if (may_collect())
-            control_label(91, 120, "ARP", library.collect ? "Tap" : "Hold");
-        control_label(162, 120, "REC", holds_keys() ? "Clear" : "Restart");
-        control_label(11, 130, "PLAY", "Hear");
-    } else if (kind != ITEM_SIGNATURE) {
-        control_label(11, 130, "PLAY", "Hear");
-    }
-    if (open) {
-        control_label(162, 130, "FX", library.show_answer ? "Hide" : (library.clue ? "Answer" : "Hint"));
-        control_label(11, 140, "SAVE", "Skip");
-    }
-    if (!open || answer != ANSWER_PLAY || holds_keys())
-        control_label(91, 140, "EDIT", open ? "Check" : "Next");
-    control_label(162, 140, "GLO", "Library");
+    draw_hints(LOWER_HEIGHT, top, hints, count);
     draw_notice();
     cv_blit(0, TOP_HEIGHT);
 }
 
 static void library_lights(void)
 {
-    uint32_t buttons = 1u << B_SEQ, controls = (1u << B_PLAY) | (1u << B_EDIT);
+    uint32_t buttons = 1u << B_SEQ, controls = (1u << B_PLAY) | (1u << B_REC);
     if (library.page == LIB_MENU) {
-        plat_lights(buttons | (1u << B_GLO), study.panel, controls, 0, 2);
+        plat_lights(buttons | (1u << B_GLO), study.panel, 1u << B_REC, 0, 2);
         return;
     }
     if (!library.over) {
+        int answer = library_answer(), open = library_quiz_open() && !library.copy;
         controls |= (library.copy ? 0 : 1u << B_FX) | (1u << B_SAVE) | (may_collect() ? 1u << B_ARP : 0);
+        /* EDIT clears the keys, or erases a written note */
+        if ((open && answer == ANSWER_PLAY) || (library.copy == COPY_WAIT && answer == ANSWER_PLAY) ||
+            (open && answer == ANSWER_WRITE && library_kind() != ITEM_SIGNATURE))
+            controls |= 1u << B_EDIT;
         if (demo_playing() || library.result == CORRECT || library.copy == COPY_DONE)
             buttons |= LED_PLAY_GREEN;
         if (library.wrong_at)                /* PLAY turns red while a miss registers */

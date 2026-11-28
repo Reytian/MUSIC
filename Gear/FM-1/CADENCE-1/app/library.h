@@ -1083,7 +1083,7 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
 {
     int kind = library_kind(), answer = library_answer();
     if (library.over) {
-        if (press & (1u << B_EDIT)) {
+        if (press & ((1u << B_REC) | (1u << B_EDIT))) {
             library_round(now, 0);
         } else if ((press & (1u << B_SEL)) && library.missed_count) {
             library_round(now, 1);
@@ -1105,17 +1105,20 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
             library.hinted = 1;
         library_play(now, 0);
     }
+    /* REC goes on: it checks, submits and moves to the next question. EDIT clears the keys or erases a
+     * written note, and where there is nothing to clear it goes on as REC does. */
     if (library.copy) {
-        /* The answer is up to be played once: EDIT or SKIP moves on, the keys' own controls work. */
-        if (press & ((1u << B_EDIT) | (1u << B_SAVE))) {
+        /* The answer is up to be played once: REC or SKIP moves on, the keys' own controls work. */
+        int keys = library.copy == COPY_WAIT && answer == ANSWER_PLAY;
+        if (press & ((1u << B_REC) | (1u << B_SAVE) | (keys ? 0 : 1u << B_EDIT))) {
             library_question(now);
             return;
         }
-        if (library.copy == COPY_DONE || answer != ANSWER_PLAY)
+        if (!keys)
             return;
         press &= ~(1u << B_FX);
     } else if (library_concluded()) {
-        if (press & (1u << B_EDIT))
+        if (press & ((1u << B_REC) | (1u << B_EDIT)))
             library_question(now);
         return;
     }
@@ -1146,7 +1149,7 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
             if (press & (1u << B_SEL))
                 library_advance_cursor(1);
         }
-        if (press & (1u << B_REC)) {
+        if (press & (1u << B_EDIT)) {
             library.filled &= ~(1 << library.cursor);
             library.wrong_slots &= ~(1u << library.cursor);
             library.written[library.cursor] = library_blank_note();
@@ -1178,17 +1181,18 @@ static void library_task_controls(uint32_t press, uint32_t now, int select, int 
         library.collected = library.checked = 0;
         library.wait_release = 1;
     }
-    if ((press & (1u << B_REC)) && answer == ANSWER_PLAY) {
+    if ((press & (1u << B_EDIT)) && answer == ANSWER_PLAY) {
         library.collected = library.checked = 0;
         library.position = 0;
         library.wrong_note = -1;
         if (library.result == WRONG)
             library.result = READY;
     }
+    int nothing_to_clear = answer == ANSWER_CHOICE || kind == ITEM_SIGNATURE;
     if (press & (1u << B_SAVE)) {
         library_conclude(SKIPPED, now);
         demo_clear();
-    } else if (press & (1u << B_EDIT)) {
+    } else if (press & ((1u << B_REC) | (nothing_to_clear ? 1u << B_EDIT : 0))) {
         if (answer != ANSWER_PLAY)
             library_submit(now);
         else if (holds_keys() && !library.wait_release)
@@ -1216,7 +1220,7 @@ static int library_controls(uint32_t press, uint32_t now, int select, int algo, 
         }
         if (preset)
             library.menu_item = wrap_index(library.menu_item + preset, library_groups[library.menu_group].count);
-        if (press & ((1u << B_EDIT) | (1u << B_SEL))) {
+        if (press & ((1u << B_REC) | (1u << B_EDIT) | (1u << B_SEL))) {
             library.group = library.menu_group;
             library.item = library.menu_item;
             library_start(now);

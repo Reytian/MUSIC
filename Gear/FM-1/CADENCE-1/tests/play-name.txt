@@ -67,7 +67,7 @@ key 16 up
 wait 1000
 
 # Two misses turn the question into its answer, heard and shown with the rule behind it. The
-# keys still listen: the answer stays up until it is played once, or EDIT moves on.
+# keys still listen: the answer stays up until it is played once, or REC moves on.
 ask 0
 wait 40
 key 7 down
@@ -97,7 +97,7 @@ key 10 up
 key 14 up
 wait 1500
 expect lib_copy 1
-tap EDIT
+tap REC
 expect lib_result 0
 expect lib_copy 0
 expect lib_seen 3
@@ -111,7 +111,7 @@ tapkey 6
 tapkey 18
 expect lib_collected 0
 tapkey 9
-tap REC
+tap EDIT
 expect lib_collected 0
 tapkey 9
 tapkey 13
@@ -184,7 +184,7 @@ key 13 up
 key 16 up
 wait 1000
 
-# Hearing it counts as a hint; SAVE skips, and EDIT moves on.
+# Hearing it counts as a hint; SAVE skips, and REC moves on.
 ask 0
 wait 40
 tap PLAY
@@ -195,7 +195,7 @@ expect lib_revealed 0
 tap SAVE
 expect lib_result 3
 expect lib_revealed 1
-tap EDIT
+tap REC
 expect lib_result 0
 
 # SELECT moves to the next activity of the group: an interval is played root first.
@@ -241,7 +241,7 @@ tapkey 13
 expect lib_result 2
 wait 1000
 
-# A scale runs from its root to the octave; REC starts it again.
+# A scale runs from its root to the octave; EDIT starts it again.
 spin SELECT 1
 expect lib_kind 3
 ask 0
@@ -249,7 +249,7 @@ wait 40
 tapkey 7
 tapkey 9
 expect lib_position 2
-tap REC
+tap EDIT
 expect lib_position 0
 tapkey 7
 tapkey 9

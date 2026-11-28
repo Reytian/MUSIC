@@ -69,7 +69,8 @@ tap EDIT
 tap SAVE
 tap EDIT
 expect lib_over 1
-tap EDIT
+# REC starts the next round (EDIT, pressed above to go on, still does too).
+tap REC
 expect lib_seen 0
 expect lib_reasked 1
 expect lib_bag 12

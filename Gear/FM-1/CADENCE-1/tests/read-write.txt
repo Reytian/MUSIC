@@ -11,7 +11,7 @@ tap SAVE
 expect pref_guided 0
 tap GLO
 spin SELECT 4
-tap EDIT
+tap REC
 expect lib_group 4
 expect lib_kind 0
 
@@ -24,7 +24,7 @@ expect lib_choice 0
 shot read-note.png
 spin PRESET 4
 expect lib_choice 4
-tap EDIT
+tap REC
 expect lib_result 2
 expect lib_first_try 1
 wait 1000
@@ -34,11 +34,11 @@ ask 26
 wait 40
 expect lib_first_note 68
 spin PRESET 4
-tap EDIT
+tap REC
 expect lib_result 1
 expect lib_misses 1
 spin ALGO 1
-tap EDIT
+tap REC
 expect lib_result 2
 expect lib_first_try 1
 wait 1000
@@ -56,10 +56,10 @@ expect lib_fifths 2
 expect lib_first_note 61
 expect lib_note_acc 1
 shot read-note-signature.png
-tap EDIT
+tap REC
 expect lib_result 1
 spin ALGO 1
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 
@@ -77,7 +77,7 @@ expect pref_signatures 0
 # Name a key signature: the question says major or minor.
 tap GLO
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_kind 1
 ask 8
 wait 40
@@ -90,7 +90,7 @@ expect demo 0
 expect lib_hinted 0
 spin PRESET 1
 expect lib_choice 1
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 ask 19
@@ -98,7 +98,7 @@ wait 40
 expect lib_fifths -3
 expect lib_minor 1
 spin PRESET -3
-tap EDIT
+tap REC
 expect lib_result 2
 shot read-signature.png
 wait 1000
@@ -106,22 +106,22 @@ wait 1000
 # On the staff an augmented fourth and a diminished fifth are different intervals.
 tap GLO
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_kind 2
 ask 60
 wait 40
 spin PRESET 5
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 ask 72
 wait 40
 spin PRESET 5
-tap EDIT
+tap REC
 expect lib_result 1
 expect lib_tried 32
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_result 2
 shot read-interval.png
 wait 1000
@@ -129,30 +129,30 @@ wait 1000
 # Name a scale.
 tap GLO
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_kind 3
 ask 33
 wait 40
 spin PRESET 2
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 
 # Name a chord: its type and its root are judged apart.
 tap GLO
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_kind 4
 ask 95
 wait 40
 spin PRESET 7
 shot read-chord.png
-tap EDIT
+tap REC
 expect lib_result 1
 expect lib_misses 1
 spin ALGO 11
 expect lib_choice_root 11
-tap EDIT
+tap REC
 expect lib_result 2
 expect lib_first_try 0
 wait 1000
@@ -160,13 +160,13 @@ wait 1000
 # Staff Construction: move the note to its line, or play its key.
 tap GLO
 spin SELECT 1
-tap EDIT
+tap REC
 expect lib_group 5
 expect lib_kind 0
 ask 25
 wait 40
 spin ALGO -2
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 ask 25
@@ -177,7 +177,7 @@ wait 20
 expect lib_filled 0
 tapkey 14
 expect lib_filled 1
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 
@@ -185,27 +185,27 @@ wait 1000
 ask 26
 wait 40
 tapkey 15
-tap EDIT
+tap REC
 expect lib_result 1
 expect lib_wrong_slots 1
 shot write-wrong.png
 spin ALGO -1
 spin PRESET 2
 expect lib_wrong_slots 0
-tap EDIT
+tap REC
 expect lib_result 2
 wait 1000
 
 # Construct a seven-sharp key signature.
 tap GLO
 spin PRESET 1
-tap EDIT
+tap REC
 expect lib_kind 1
 ask 14
 wait 40
 expect lib_fifths 7
 spin PRESET 7
-tap EDIT
+tap REC
 expect lib_result 2
 shot write-signature.png
 wait 1000
@@ -213,7 +213,7 @@ wait 1000
 # Build a D minor-major seventh on its written root.
 tap GLO
 spin PRESET 3
-tap EDIT
+tap REC
 expect lib_kind 4
 ask 134
 wait 40
@@ -224,6 +224,12 @@ tapkey 12
 tapkey 16
 tapkey 20
 expect lib_filled 15
+# EDIT erases the note under the cursor and checks nothing; REC checks.
 tap EDIT
+expect lib_filled 7
+expect lib_result 0
+tapkey 20
+expect lib_filled 15
+tap REC
 expect lib_result 2
 shot write-chord.png

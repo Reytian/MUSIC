@@ -31,8 +31,7 @@ static void guide_frame(uint32_t now)
     for (int i = 0; i < 7; ++i)
         cv_text(17, 3 + 14 * i, &FONT_XS, lesson->lines[i], i == 0 ? STUDY_MINT : STUDY_INK);
     cv_text(12, 111, &FONT_XS, lesson->example, STUDY_MINT);
-    control_label(12, 135, "SELECT", "Topic");
-    control_label(92, 135, "PLAY", "Hear");
-    control_label(167, 135, "SEL", "Back");
+    static const Hint hints[] = {{"SELECT", "Topic"}, {"PLAY", "Hear"}, {"SEL", "Back"}};
+    draw_hints(LOWER_HEIGHT, hints_top(LOWER_HEIGHT, 1), hints, 3);
     cv_blit(0, TOP_HEIGHT);
 }

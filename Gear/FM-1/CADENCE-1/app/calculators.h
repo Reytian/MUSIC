@@ -95,7 +95,7 @@ static int calc_controls(uint32_t press, uint32_t now, int select, int algo, int
             calc.item = wrap_index(calc.item + select + preset, CALC_COUNT);
             study.dirty = 1;
         }
-        if (press & ((1u << B_EDIT) | (1u << B_SEL))) {
+        if (press & ((1u << B_REC) | (1u << B_EDIT) | (1u << B_SEL))) {
             calc.page = LIB_TASK;
             calc.root = calc.quality = calc.fifths = calc.minor = 0;
             calc.degree = calc.inversion = calc.alteration = calc.accidental = 0;

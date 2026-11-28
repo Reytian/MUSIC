@@ -20,19 +20,19 @@ key 0 up
 key 1 up
 key 3 up
 wait 1500
-tap EDIT
+tap REC
 
 # A skipped question comes back too, after the missed one ahead of it in the queue.
 tap SAVE
 expect lib_again 2
-tap EDIT
+tap REC
 tap SAVE
 expect lib_again 3
-tap EDIT
+tap REC
 expect lib_seen 3
 tap SAVE
 expect lib_again 4
-tap EDIT
+tap REC
 expect lib_item_id 23
 expect lib_again 3
 expect lib_seen 4

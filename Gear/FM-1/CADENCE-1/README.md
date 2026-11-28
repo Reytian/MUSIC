@@ -16,7 +16,7 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
 
 ## 练习
 
-按 **SEQ** 回到上次的练习，进度不变；关机重开后也回到上次打开的那项。新机器第一次按 **SEQ** 进入 Keyboard 的音名题。按 **GLO** 打开练习目录，转 **SELECT** 选组，转 **PRESETS** 选练习，按 **EDIT** 打开。再按 **GLO** 不换练习直接返回。
+按 **SEQ** 回到上次的练习，进度不变；关机重开后也回到上次打开的那项。新机器第一次按 **SEQ** 进入 Keyboard 的音名题。按 **GLO** 打开练习目录，转 **SELECT** 选组，转 **PRESETS** 选练习，按 **REC** 打开。再按 **GLO** 不换练习直接返回。
 
 | 组 | 看到或听到的 | 怎么答 | 练习 |
 | --- | --- | --- | --- |
@@ -33,9 +33,11 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
 
 ### 作答
 
-- **弹琴键**。和弦同时按住，任意转位和八度重复都算对；**ARP** 切换到逐音输入（Tap），**REC** 清空。音程和音阶从根音起逐音向上弹，**REC** 重来。转位题要求指定的音在最低。照谱弹的和弦要按谱上写的那几个键，旋律按谱上的顺序逐个弹。和弦进行逐个弹，换和弦前先松手。
-- **在屏幕上选**。所有选项排成网格，转 **PRESETS** 移动高亮，按 **EDIT** 提交。音名题用 **ALGORITHM** 选升降号，和弦题用 **ALGORITHM** 选根音。
-- **写到谱上**。**SELECT** 选音符位置，**ALGORITHM** 上下移动，**PRESETS** 改升降号，**SEL** 写入，**REC** 擦除。也可以弹琴键录入再修正写法。调号题用 **PRESETS** 增减升降号。
+右侧按键里 **PLAY** 和 **REC** 挨着：**PLAY** 听，**REC** 确认，用来提交选择、检查写好的谱、进入下一题和开始新一轮。**EDIT** 清空按住的琴键或擦掉写错的音；没有可清空的内容时，**EDIT** 也和 **REC** 一样确认。屏幕最下一行总是 **FX**、**PLAY**、**REC**，左右顺序和面板上一致。
+
+- **弹琴键**。和弦同时按住，任意转位和八度重复都算对；**ARP** 切换到逐音输入（Tap），**EDIT** 清空。音程和音阶从根音起逐音向上弹，**EDIT** 重来。转位题要求指定的音在最低。照谱弹的和弦要按谱上写的那几个键，旋律按谱上的顺序逐个弹。和弦进行逐个弹，换和弦前先松手。
+- **在屏幕上选**。所有选项排成网格，转 **PRESETS** 移动高亮，按 **REC** 提交。音名题用 **ALGORITHM** 选升降号，和弦题用 **ALGORITHM** 选根音。
+- **写到谱上**。**SELECT** 选音符位置，**ALGORITHM** 上下移动，**PRESETS** 改升降号，**SEL** 写入，**EDIT** 擦除，**REC** 检查。也可以弹琴键录入再修正写法。调号题用 **PRESETS** 增减升降号。
 
 **FX** 看提示，**SAVE** 跳过，**PLAY** 试听。听辨题的 **PLAY** 是重听题目；其他题在答对前按 **PLAY** 算用了提示。弹琴键和屏幕选择的练习里，转 **SELECT** 可换到同组的下一项练习。
 
@@ -49,7 +51,7 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
 
 ### 反馈
 
-- 答对后自动进入下一题，可在设置里改为按 **EDIT**。
+- 答对后自动进入下一题，可在设置里改为按 **REC**。
 - 答错时错的琴键或音符显示为红色，PLAY 灯闪红。下面这几种答错，屏幕会说明哪里对、哪里错：
   - 和弦识别题，根音和类型只对了一样；
   - 写谱时键对了但字母不对，或字母对了但升降号不对；
@@ -57,14 +59,14 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
   - 音程的度数对了但半音数不对，或半音数对了但度数不对（例如 A4 和 d5）。
 - 听辨题答错后，先播放你选的，再播放题目，便于对比。
 - 同一题错两次后直接给出答案并播放，次数可在设置里改。答案旁边附上规则，例如 C + m6 写着 "Minor 6th: 8 half steps, 6 letters"，Bb 小调写着 "Like Db major: Bb Eb Ab Db Gb"。
-- 弹琴键的题给出答案后，琴键继续接收输入：照着亮起的键弹对一次就进下一题。这一次不计分，也可以按 **EDIT** 直接继续。
+- 弹琴键的题给出答案后，琴键继续接收输入：照着亮起的键弹对一次就进下一题。这一次不计分，也可以按 **REC** 直接继续。
 - 答错、跳过和看了提示才答对的题，隔三题会再问一次。每题只回问一次，之后留在本轮的复习清单里。
-- 第一次遇到一种音程、和弦或音阶时，先展示再考：屏幕显示名称、规则、谱面和琴键，并播放声音，标着 NEW。照着弹一次或按 **EDIT** 后继续，几题之后再正式考它。展示不算本轮的题，限时的一轮里不展示。
+- 第一次遇到一种音程、和弦或音阶时，先展示再考：屏幕显示名称、规则、谱面和琴键，并播放声音，标着 NEW。照着弹一次或按 **REC** 后继续，几题之后再正式考它。展示不算本轮的题，限时的一轮里不展示。
 - 听辨题在出题时自动播放。
 
 ### 一轮
 
-默认每轮 10 题。一轮结束显示首答正确数、平均用时和需要复习的条目。按 **EDIT** 开始新一轮，按 **SEL** 只重练错题。
+默认每轮 10 题。一轮结束显示首答正确数、平均用时和需要复习的条目。按 **REC** 开始新一轮，按 **SEL** 只重练错题。
 
 同一项练习里，所有条目轮过一遍才会重复。每个条目有一个 0 到 5 的熟练度：答得又对又快上升，答错或跳过下降。熟练度低的先出，已经很熟的大约每两轮才出一次。熟练度保存在机器里，关机不丢：每轮结束时保存，一轮当中每分钟保存一次。
 
@@ -91,7 +93,7 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
 - **Staff clef**：高音或低音谱号。
 - **Questions per round**：每轮 5 到 30 题。
 - **Timed round**：关闭，或限时 1 到 3 分钟。
-- **Next question**：答对后自动进题，或按 **EDIT**。
+- **Next question**：答对后自动进题，或按 **REC**。
 - **Reveal the answer**：错 2 次、错 3 次后给出答案，或从不。
 - **Material**：选 **Levels** 按上表分级，下面显示五个级别；选 **Custom** 则自己筛选，下面显示音程、和弦、音阶的类型筛选（用 **PRESETS** 浏览，**SEL** 切换是否纳入）、单音是否只用自然音、和弦是否带转位、读谱是否带调号、是否用加线。
 - **Ear interval order**：听辨音程上行、下行或同时。
@@ -101,23 +103,25 @@ CADENCE-1 是一套独立的乐理学习固件，思路取自 Tenuto，并把 FM
 
 ## 试听与安装
 
-- **先试听**。在 [FM-1 Emulator](https://joakimeriksson.github.io/fm1-emu/) 选择 **Open .fwsc…**，打开 [cadence-1-0.5.0.fwsc](dist/cadence-1-0.5.0.fwsc)。
-- **安装到 FM-1**。固件包适用于 M-VAVE FM-1。刷写前备份目前的固件与数据，可使用 [M-Flasher](https://github.com/jvitkauskas/m-flasher)。在已经运行兼容社区固件的 FM-1 上，可用数据线连接并运行下面的更新程序。它会显示识别到的设备，确认后才开始写入。
+- **先试听**。在 [FM-1 Emulator](https://joakimeriksson.github.io/fm1-emu/) 选择 **Open .fwsc…**，打开 [cadence-1-0.6.1.fwsc](dist/cadence-1-0.6.1.fwsc)。
+- **安装到 FM-1**。固件包适用于 M-VAVE FM-1。刷写前备份目前的固件与数据，可使用 [M-Flasher](https://github.com/jvitkauskas/m-flasher)。在已经运行兼容社区固件的 FM-1 上，可用数据线连接并运行下面的更新程序。它会显示识别到的设备，确认后才开始写入。更新程序在 [fm1-base](https://github.com/charlesvestal/fm1-base) 里，取和 `build.sh` 相同的版本：
 
 ```sh
-python3 base/tools/fm1_install.py dist/cadence-1-0.5.0.fwsc
+git clone https://github.com/charlesvestal/fm1-base.git
+git -C fm1-base checkout 3c4a57e
+python3 fm1-base/tools/fm1_install.py path/to/cadence-1-0.6.1.fwsc
 ```
 
-更新程序需要 `mido` 和 `python-rtmidi`。首次使用原厂固件或其他引导程序的机器，请按现有固件的安装路径操作。设备固件身份为 `FM-1_54000500`。文件校验值见 [SHA256SUMS](dist/SHA256SUMS)。
+把 `path/to/` 换成固件包所在的位置，在本仓库的 CADENCE-1 目录里就是 `dist/`。运行过 `./build.sh` 的话，也可以直接用 `base/tools/fm1_install.py`。更新程序需要 `mido` 和 `python-rtmidi`。首次使用原厂固件或其他引导程序的机器，请按现有固件的安装路径操作。设备固件身份为 `FM-1_54000601`。文件校验值见 [SHA256SUMS](dist/SHA256SUMS)。
 
-0.5.0 已在桌面模拟器、fm1-emu 网页模拟器（原样运行这个固件包，模拟 FM-1 的芯片）和一台 FM-1 真机上测过。
+0.6.1 已通过桌面模拟器的全部测试，并在一台 FM-1 真机上运行过。
 
 ## 构建与验证
 
 先安装 Python 3 和 Pillow。真机包另外需要 [JieLi Linux x86‑64 工具链及 AC79 SDK](https://github.com/charlesvestal/fm1-base)，Apple silicon Mac 可用支持 linux/amd64 的 Docker 环境。
 
 ```sh
-./build.sh --release 0.5.0
+./build.sh --release 0.6.1
 ./build.sh --host
 cc -std=c99 -Wall -Wextra -Werror tests/notation.c -o app/build/host/notation_test
 app/build/host/notation_test

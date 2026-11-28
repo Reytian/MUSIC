@@ -49,15 +49,19 @@ static void draw_header(const char *heading, const char *eyebrow, uint16_t accen
     tab(11, "LEARN", "HOME", !study.practice);
     tab(123, "PRACTICE", "SEQ", study.practice);
     cv_text(12, 30, &FONT_B, heading, STUDY_INK);
-    text_right(228, 32, &FONT_T, eyebrow, STUDY_MUTED);
+    text_right(228, 31, &FONT_XS, eyebrow, STUDY_MUTED);
     cv_rect(11, 48, 218, 40, STUDY_CARD);
     cv_rect(11, 48, 2, 40, accent);
 }
 
-/* The card's second line: a long rule steps down to the small face rather than run off the card. */
+/* The card's second line, in the bold face when it fits: a long rule steps down rather than run
+ * off the card. */
 static void draw_card_detail(const char *detail, uint16_t color)
 {
-    cv_text(21, 71, text_w(&FONT_XS, detail) > 206 ? &FONT_T : &FONT_XS, detail, color);
+    if (text_w(&FONT_B, detail) <= 206)
+        cv_text(21, 70, &FONT_B, detail, color);
+    else
+        cv_text(21, 71, text_w(&FONT_XS, detail) > 206 ? &FONT_T : &FONT_XS, detail, color);
 }
 
 static void draw_card_text(const char *title, const char *detail, uint16_t detail_color, int room)
@@ -124,8 +128,54 @@ static void draw_keyboard(int y, int height, uint32_t guides, uint32_t heard, ui
 
 static void control_label(int x, int y, const char *control, const char *action)
 {
-    x = cv_text(x, y, &FONT_T, control, STUDY_MINT);
-    cv_caps(x + 4, y, &FONT_T, action, STUDY_MUTED);
+    x = cv_text(x, y, &FONT_XS, control, STUDY_MINT);
+    cv_caps(x + 4, y, &FONT_XS, action, STUDY_MUTED);
+}
+
+/* A control and what it does now; a missing control leaves its place empty. */
+typedef struct {
+    const char *control, *action;
+} Hint;
+
+enum { HINT_PITCH = 12, HINT_ROOM = 70 };
+
+static int hint_columns(const Hint *hints, int count)
+{
+    char upper[48];
+    for (int i = 0; i < count; ++i) {
+        if (!hints[i].control)
+            continue;
+        caps_copy(upper, hints[i].action);
+        if (text_w(&FONT_XS, hints[i].control) + 4 + text_w(&FONT_XS, upper) > HINT_ROOM)
+            return 2;
+    }
+    return 3;
+}
+
+static int hint_rows(const Hint *hints, int count)
+{
+    int columns = hint_columns(hints, count);
+    return (count + columns - 1) / columns;
+}
+
+/* The rule above ROWS of hints at the foot of a band BOTTOM tall, two rows clear of the screen's
+ * edge: what is drawn above stays over it. */
+static int hints_top(int bottom, int rows)
+{
+    return bottom - 2 - HINT_PITCH * rows - 1;
+}
+
+/* The controls that matter now, along the foot of a band: three to a row when they fit, else two,
+ * the last row at the bottom, so it stays put while the rows above come and go. */
+static void draw_hints(int bottom, int top, const Hint *hints, int count)
+{
+    int columns = hint_columns(hints, count), rows = (count + columns - 1) / columns;
+    cv_rect(11, top, 218, 1, STUDY_LINE);
+    for (int i = 0; i < count; ++i) {
+        if (hints[i].control)
+            control_label(11 + (i % columns) * (columns == 3 ? 74 : 109),
+                          bottom - 2 - HINT_PITCH * (rows - i / columns), hints[i].control, hints[i].action);
+    }
 }
 
 static void draw_score_readout(const char *line, uint16_t color)
@@ -170,20 +220,16 @@ static void learn_bottom(void)
                            .filled = (1u << shape->count) - 1u, .cursor = -1, .live = 1});
     tone_list(line);
     draw_score_readout(line, STUDY_MINT);
-    draw_keyboard(SCORE_KEYS_Y, 117 - SCORE_KEYS_Y, learn_guides(), demo_lights(), 0, 0);
-    cv_rect(11, 118, 218, 1, STUDY_LINE);
-    control_label(11, 120, "SELECT", "Topic");
-    control_label(94, 120, "ALGO", "Type");
-    control_label(169, 120, "PRESET", "Root");
-    control_label(11, 130, "PLAY", "Hear");
-    if (is_chord())
-        control_label(94, 130, "ARP", "Roll");
-    else
-        control_label(94, 130, "OCT", "Octave");
-    control_label(169, 130, "ENV", "Settings");
-    cv_text(11, 139, &FONT_XS, shape->formula, STUDY_INK);
-    control_label(130, 140, "SEL", "Guide");
-    control_label(181, 140, "GLO", "Tools");
+    /* the formula takes the last row's first place */
+    const Hint hints[] = {
+        {"SELECT", "Topic"}, {"ALGO", "Type"}, {"PRESET", "Root"},
+        {"PLAY", "Hear"}, is_chord() ? (Hint){"ARP", "Roll"} : (Hint){"OCT", "Octave"}, {"ENV", "Settings"},
+        {0, 0}, {"SEL", "Guide"}, {"GLO", "Tools"},
+    };
+    int top = hints_top(LOWER_HEIGHT, 3);
+    draw_keyboard(SCORE_KEYS_Y, top - 1 - SCORE_KEYS_Y, learn_guides(), demo_lights(), 0, 0);
+    draw_hints(LOWER_HEIGHT, top, hints, 9);
+    cv_text(11, LOWER_HEIGHT - 2 - HINT_PITCH, &FONT_XS, shape->formula, STUDY_INK);
     draw_notice();
     cv_blit(0, TOP_HEIGHT);
 }

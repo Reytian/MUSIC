@@ -40,7 +40,7 @@ static void calc_menu(void)
     cv_begin(240, 91, STUDY_BG);
     library_title_bar("Learn Tools", "CADENCE-1");
     cv_rect(11, 41, 81, 20, STUDY_MINT);
-    cv_text(16, 43, &FONT_XS, "Calculators", STUDY_BG);
+    cv_text(16, 43, &FONT_B, "Calculators", STUDY_BG);
     for (int band = 0; band < 2; ++band) {
         int offset = band ? 91 : 0, height = band ? 149 : 91;
         if (band) {
@@ -54,15 +54,13 @@ static void calc_menu(void)
             cv_rect(101, y, 128, 20, STUDY_CARD);
             if (active)
                 cv_rect(101, y, 2, 20, STUDY_MINT);
-            cv_text(109, y + 2, &FONT_XS, calc_names[i], active ? STUDY_INK : STUDY_MUTED);
+            cv_text(109, y + 2, &FONT_B, calc_names[i], active ? STUDY_INK : STUDY_MUTED);
         }
     }
-    cv_rect(11, 111, 218, 1, STUDY_LINE);
-    control_label(11, 115, "HOME", "Learn");
-    control_label(118, 115, "PRESET", "Tool");
-    control_label(11, 127, "EDIT", "Open");
-    control_label(118, 127, "GLO", "Close");
-    control_label(11, 137, "ENV", "Settings");
+    static const Hint hints[] = {
+        {"PRESET", "Tool"}, {"REC", "Open"}, {"GLO", "Close"}, {"HOME", "Learn"}, {"ENV", "Settings"},
+    };
+    draw_hints(149, hints_top(149, 2), hints, 5);
     cv_blit(0, 91);
 }
 
@@ -165,27 +163,29 @@ static void calc_task_bottom(void)
             p = note_text(i ? append_text(p, " ") : p, calc.target[i], 0);
     }
     draw_score_readout(line, STUDY_MINT);
-    draw_keyboard(SCORE_KEYS_Y, 117 - SCORE_KEYS_Y, calc_keys(), demo_lights(), 0, 0);
-    cv_rect(11, 118, 218, 1, STUDY_LINE);
+    Hint hints[9] = {{0, 0}};
+    int count = 0;
     if (calc.item == CALC_ACCIDENTAL) {
-        control_label(11, 120, "SELECT", "Note");
-        control_label(91, 120, "ALGO", "Key");
-        control_label(162, 120, "PRESET", "Sign");
+        hints[count++] = (Hint){"SELECT", "Note"};
+        hints[count++] = (Hint){"ALGO", "Key"};
+        hints[count++] = (Hint){"PRESET", "Sign"};
     } else if (calc.item == CALC_ROMAN) {
-        control_label(11, 120, "SELECT", "Key");
-        control_label(91, 120, "ALGO", "Degree");
-        control_label(162, 120, "PRESET", "Type");
-        control_label(11, 131, "K1", "Inversion");
-        control_label(91, 131, "K2", "Alter");
-        control_label(162, 131, "REC", "Maj/min");
+        hints[count++] = (Hint){"SELECT", "Key"};
+        hints[count++] = (Hint){"ALGO", "Degree"};
+        hints[count++] = (Hint){"PRESET", "Type"};
+        hints[count++] = (Hint){"K1", "Inversion"};
+        hints[count++] = (Hint){"K2", "Alter"};
+        hints[count++] = (Hint){"REC", "Maj/min"};
     } else {
-        if (calc.item != CALC_SCALE)
-            control_label(11, 120, "SELECT", "Key");
-        control_label(91, 120, "ALGO", "Type");
-        control_label(162, 120, "PRESET", "Root");
+        hints[count++] = calc.item != CALC_SCALE ? (Hint){"SELECT", "Key"} : (Hint){0, 0};
+        hints[count++] = (Hint){"ALGO", "Type"};
+        hints[count++] = (Hint){"PRESET", "Root"};
     }
-    control_label(11, 141, "PLAY", "Hear");
-    control_label(91, 141, "OCT", "Octave");
+    hints[count++] = (Hint){"PLAY", "Hear"};
+    hints[count++] = (Hint){"OCT", "Octave"};
+    int top = hints_top(LOWER_HEIGHT, hint_rows(hints, count));
+    draw_keyboard(SCORE_KEYS_Y, top - 1 - SCORE_KEYS_Y, calc_keys(), demo_lights(), 0, 0);
+    draw_hints(LOWER_HEIGHT, top, hints, count);
     draw_notice();
     cv_blit(0, TOP_HEIGHT);
 }
